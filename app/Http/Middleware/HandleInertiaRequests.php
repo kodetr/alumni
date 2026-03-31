@@ -2,7 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -36,6 +38,17 @@ class HandleInertiaRequests extends Middleware
             ],
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
+            ],
+            'integration' => [
+                'menuDataConnection' => function () use ($request): ?array {
+                    $user = $request->user();
+
+                    if (! $user instanceof User || ! $user->isAdmin()) {
+                        return null;
+                    }
+
+                    return Cache::get((string) config('integration.status_cache_key', 'integration.menu_data.connection_status'));
+                },
             ],
         ];
     }

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AlumniController;
 use App\Http\Controllers\EventController;
+use App\Http\Controllers\IntegrationSettingsController;
 use App\Http\Controllers\NewsPostController;
 use App\Http\Controllers\ProfileController;
 use App\Models\Alumni;
@@ -138,6 +139,27 @@ Route::middleware('auth')->group(function () {
             ->names('agenda')
             ->parameters(['agenda' => 'event'])
             ->where(['event' => '[0-9]+']);
+        Route::get('pengaturan/integrasi', [IntegrationSettingsController::class, 'index'])
+            ->name('settings.integration.index');
+        Route::post('pengaturan/integrasi/save', [IntegrationSettingsController::class, 'saveConfig'])
+            ->name('settings.integration.save');
+        Route::post('pengaturan/integrasi/test', [IntegrationSettingsController::class, 'testConnection'])
+            ->name('settings.integration.test');
+        Route::post('pengaturan/integrasi/fetch', [IntegrationSettingsController::class, 'fetch'])
+            ->name('settings.integration.fetch');
+        Route::post('pengaturan/integrasi/simpan-alumni', [IntegrationSettingsController::class, 'storeAlumniPreview'])
+            ->name('settings.integration.store-alumni');
+        Route::post('pengaturan/database/backup', [IntegrationSettingsController::class, 'backupDatabase'])
+            ->name('settings.database.backup');
+        Route::post('pengaturan/database/restore', [IntegrationSettingsController::class, 'restoreDatabase'])
+            ->name('settings.database.restore');
+        Route::post('pengaturan/database/import', [IntegrationSettingsController::class, 'importDatabase'])
+            ->name('settings.database.import');
+        Route::delete('pengaturan/database/delete', [IntegrationSettingsController::class, 'deleteBackup'])
+            ->name('settings.database.delete');
+        Route::get('pengaturan/database/download/{fileName}', [IntegrationSettingsController::class, 'downloadBackup'])
+            ->where('fileName', '[A-Za-z0-9._-]+')
+            ->name('settings.database.download');
     });
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

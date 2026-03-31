@@ -65,6 +65,13 @@ const roleLabel = computed(() => (isAdmin.value ? 'Superadmin' : 'Alumni'));
                                 >
                                     Agenda
                                 </NavLink>
+                                <NavLink
+                                    v-if="isAdmin"
+                                    :href="route('settings.integration.index')"
+                                    :active="route().current('settings.integration.*')"
+                                >
+                                    Pengaturan
+                                </NavLink>
                             </div>
                         </div>
 
@@ -197,6 +204,13 @@ const roleLabel = computed(() => (isAdmin.value ? 'Superadmin' : 'Alumni'));
                             :active="route().current('agenda.*')"
                         >
                             Agenda
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            v-if="isAdmin"
+                            :href="route('settings.integration.index')"
+                            :active="route().current('settings.integration.*')"
+                        >
+                            Pengaturan
                         </ResponsiveNavLink>
                     </div>
 
