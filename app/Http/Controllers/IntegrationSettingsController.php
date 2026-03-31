@@ -142,11 +142,30 @@ class IntegrationSettingsController extends Controller
                             'angkatan' => (int) $record['angkatan'],
                             'tahun_lulus' => isset($record['tahun_lulus']) && $record['tahun_lulus'] !== '' ? (int) $record['tahun_lulus'] : null,
                             'pekerjaan' => $this->nullableString($record['pekerjaan'] ?? null),
+                            'organisasi' => $this->nullableString($record['organisasi'] ?? null),
+                            'fakultas' => $this->nullableString($record['fakultas'] ?? null),
                             'instansi' => $this->nullableString($record['instansi'] ?? null),
                             'alamat' => $this->nullableString($record['alamat'] ?? null),
                             'integration_payload' => isset($record['integration_payload']) && is_array($record['integration_payload'])
-                                ? $record['integration_payload']
+                                ? $this->filterIntegrationPayload($record['integration_payload'])
                                 : null,
+                            'tempat_lahir' => $this->nullableString($record['tempat_lahir'] ?? $record['birth_place'] ?? null),
+                            'tanggal_lahir' => $this->parseDate($record['tanggal_lahir'] ?? $record['birth_date'] ?? null),
+                            'agama' => $this->nullableString($record['agama'] ?? $record['religion'] ?? null),
+                            'jenis_kelamin' => $this->nullableString($record['jenis_kelamin'] ?? $record['gender'] ?? null),
+                            'no_ktp' => $this->nullableString($record['no_ktp'] ?? $record['ktp_number'] ?? null),
+                            'ipk' => isset($record['ipk']) ? (float) $record['ipk'] : null,
+                            'predikat' => $this->nullableString($record['predikat'] ?? $record['predicate'] ?? null),
+                            'judul_skripsi' => $this->nullableString($record['judul_skripsi'] ?? $record['thesis_title'] ?? null),
+                            'pembimbing_1' => $this->nullableString($record['pembimbing_1'] ?? $record['supervisor_1'] ?? null),
+                            'pembimbing_2' => $this->nullableString($record['pembimbing_2'] ?? $record['supervisor_2'] ?? null),
+                            'ukuran_toga' => $this->nullableString($record['ukuran_toga'] ?? $record['gown_size'] ?? null),
+                            'status_bekerja' => isset($record['status_bekerja']) || isset($record['is_employed'])
+                                ? ($record['status_bekerja'] ?? $record['is_employed'] ?? null)
+                                : null,
+                            'nama_ayah' => $this->nullableString($record['nama_ayah'] ?? $record['father_name'] ?? null),
+                            'nama_ibu' => $this->nullableString($record['nama_ibu'] ?? $record['mother_name'] ?? null),
+                            'no_telepon_orang_tua' => $this->nullableString($record['no_telepon_orang_tua'] ?? $record['parent_phone'] ?? null),
                         ],
                     );
 
@@ -1004,6 +1023,79 @@ class IntegrationSettingsController extends Controller
         $trimmed = trim($value);
 
         return $trimmed !== '' ? $trimmed : null;
+    }
+
+    private function parseDate(mixed $value): ?string
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        $date = match (true) {
+            is_numeric($value) => gmdate('Y-m-d', (int) $value),
+            strtotime($value) !== false => date('Y-m-d', strtotime($value)),
+            default => null,
+        };
+
+        return $date;
+    }
+
+    private function filterIntegrationPayload(array $payload): array
+    {
+        $excludeKeys = [
+            'source_graduate_id',
+            'source_student_id',
+            'student_user_id',
+            'faculty_id',
+            'study_program_id',
+            'source_session_id',
+            'source_ceremony_id',
+            'archived_by_user_id',
+            'verified_by_user_id',
+            'rejection_note',
+            'profile_status',
+            'call_order',
+            'attendance_status',
+            'archived_at',
+            'created_at',
+            'updated_at',
+            'submitted_at',
+            'verified_at',
+            'source_session',
+            'faculty',
+            'study_program',
+            'archived_by',
+            'verified_by',
+        ];
+
+        $excludePatterns = ['_id', 'Nama Sesi', 'Nama Acara', 'ID User', 'Diperbarui', 'Diarsipkan', 'Diverifikasi'];
+
+        $filtered = [];
+
+        foreach ($payload as $key => $value) {
+            if (in_array($key, $excludeKeys, true)) {
+                continue;
+            }
+
+            $skip = false;
+            foreach ($excludePatterns as $pattern) {
+                if (str_contains($key, $pattern)) {
+                    $skip = true;
+                    break;
+                }
+            }
+            if ($skip) {
+                continue;
+            }
+
+            if (is_array($value)) {
+                $filtered[$key] = $this->filterIntegrationPayload($value);
+            } else {
+                $filtered[$key] = $value;
+            }
+        }
+
+        return $filtered;
     }
 
     private function formatBytes(int $bytes): string

@@ -21,9 +21,26 @@ class Alumni extends Model
         'angkatan',
         'tahun_lulus',
         'pekerjaan',
+        'organisasi',
+        'fakultas',
         'instansi',
         'alamat',
         'integration_payload',
+        'tempat_lahir',
+        'tanggal_lahir',
+        'agama',
+        'jenis_kelamin',
+        'no_ktp',
+        'ipk',
+        'predikat',
+        'judul_skripsi',
+        'pembimbing_1',
+        'pembimbing_2',
+        'ukuran_toga',
+        'status_bekerja',
+        'nama_ayah',
+        'nama_ibu',
+        'no_telepon_orang_tua',
     ];
 
     /**
@@ -33,5 +50,8 @@ class Alumni extends Model
         'angkatan' => 'integer',
         'tahun_lulus' => 'integer',
         'integration_payload' => 'array',
+        'tanggal_lahir' => 'date',
+        'ipk' => 'decimal:2',
+        'status_bekerja' => 'boolean',
     ];
 }

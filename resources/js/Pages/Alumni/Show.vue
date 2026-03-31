@@ -27,162 +27,6 @@ const photoUrl = computed(() => {
 
     return typeof payloadPhoto === 'string' && payloadPhoto.trim() !== '' ? payloadPhoto : null;
 });
-
-const hasPayload = computed(() => props.alumni.integration_payload && typeof props.alumni.integration_payload === 'object');
-
-const ignoredPayloadKeys = new Set([
-    'nim',
-    'full_name',
-    'study_program_name',
-    'faculty_name',
-    'personal_email',
-    'campus_email',
-    'phone_number',
-    'full_address',
-    'intake_year',
-    'photo_path',
-    'photo_3x4_path',
-]);
-
-const payloadLabelMap = {
-    source_graduate_id: 'ID Sumber Lulusan',
-    source_student_id: 'ID Sumber Mahasiswa',
-    student_user_id: 'ID User Mahasiswa',
-    faculty_id: 'ID Fakultas',
-    faculty_name: 'Fakultas',
-    study_program_id: 'ID Program Studi',
-    study_program_name: 'Program Studi',
-    campus_email: 'Email Kampus',
-    ipk: 'IPK',
-    predicate: 'Predikat Kelulusan',
-    thesis_title: 'Judul Skripsi/Tesis',
-    supervisor_1: 'Pembimbing 1',
-    supervisor_2: 'Pembimbing 2',
-    intake_year: 'Tahun Angkatan',
-    birth_place: 'Tempat Lahir',
-    birth_date: 'Tanggal Lahir',
-    religion: 'Agama',
-    gender: 'Jenis Kelamin',
-    phone_number: 'Nomor Telepon',
-    personal_email: 'Email Pribadi',
-    ktp_number: 'Nomor KTP',
-    full_address: 'Alamat Lengkap',
-    gown_size: 'Ukuran Toga',
-    is_employed: 'Status Bekerja',
-    father_name: 'Nama Ayah',
-    mother_name: 'Nama Ibu',
-    parent_phone: 'Nomor Telepon Orang Tua',
-    photo_3x4_path: 'Foto 3x4',
-    ktp_photo_path: 'Foto KTP',
-    diploma_document_path: 'Dokumen Ijazah',
-    payment_proof_path: 'Bukti Pembayaran',
-    extra_document_link: 'Link Dokumen Tambahan',
-    profile_status: 'Status Profil',
-    submitted_at: 'Tanggal Submit',
-    verified_at: 'Tanggal Verifikasi',
-    verified_by_user_id: 'Diverifikasi Oleh (ID User)',
-    rejection_note: 'Catatan Penolakan',
-    photo_path: 'Path Foto',
-    call_order: 'Urutan Panggil',
-    source_session_id: 'ID Sesi Sumber',
-    source_session_name: 'Nama Sesi Sumber',
-    source_ceremony_name: 'Nama Acara Wisuda',
-    attendance_status: 'Status Kehadiran',
-    archived_at: 'Tanggal Arsip',
-    archived_by_user_id: 'Diarsipkan Oleh (ID User)',
-    created_at: 'Dibuat Pada',
-    updated_at: 'Diperbarui Pada',
-    'source_session.id': 'ID Sesi',
-    'source_session.session_name': 'Nama Sesi',
-    'source_session.ceremony_id': 'ID Acara Wisuda',
-    'source_session.ceremony.id': 'ID Acara',
-    'source_session.ceremony.name': 'Nama Acara',
-    'faculty.id': 'ID Fakultas',
-    'faculty.name': 'Nama Fakultas',
-    'study_program.id': 'ID Program Studi',
-    'study_program.name': 'Nama Program Studi',
-    'archived_by.id': 'ID User Pengarsip',
-    'archived_by.name': 'Nama Pengarsip',
-    'archived_by.email': 'Email Pengarsip',
-    'verified_by.id': 'ID User Verifikator',
-    'verified_by.name': 'Nama Verifikator',
-    'verified_by.email': 'Email Verifikator',
-};
-
-const formatPayloadValue = (value) => {
-    if (value === null || value === undefined || String(value).trim() === '') {
-        return '-';
-    }
-
-    if (typeof value === 'boolean') {
-        return value ? 'Ya' : 'Tidak';
-    }
-
-    if (typeof value === 'string') {
-        const trimmed = value.trim();
-
-        if (/^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z)?)?$/.test(trimmed)) {
-            const date = new Date(trimmed);
-
-            if (!Number.isNaN(date.getTime())) {
-                return date.toLocaleString('id-ID');
-            }
-        }
-
-        return trimmed;
-    }
-
-    return String(value);
-};
-
-const toLabel = (key) =>
-    payloadLabelMap[key] ||
-    key
-        .replaceAll('.', ' ')
-        .replaceAll('_', ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .replace(/\b\w/g, (char) => char.toUpperCase());
-
-const flattenPayload = (value, prefix = '') => {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
-        return [];
-    }
-
-    const entries = [];
-
-    Object.entries(value).forEach(([key, currentValue]) => {
-        const path = prefix ? `${prefix}.${key}` : key;
-
-        if (currentValue !== null && typeof currentValue === 'object' && !Array.isArray(currentValue)) {
-            entries.push(...flattenPayload(currentValue, path));
-
-            return;
-        }
-
-        if (ignoredPayloadKeys.has(path) || ignoredPayloadKeys.has(key)) {
-            return;
-        }
-
-        let formattedValue = '-';
-
-        if (Array.isArray(currentValue)) {
-            formattedValue = currentValue.length ? currentValue.map((item) => formatPayloadValue(item)).join(', ') : '-';
-        } else {
-            formattedValue = formatPayloadValue(currentValue);
-        }
-
-        entries.push({
-            key: path,
-            label: toLabel(path),
-            value: formattedValue,
-        });
-    });
-
-    return entries;
-};
-
-const integrationEntries = computed(() => flattenPayload(props.alumni.integration_payload));
 </script>
 
 <template>
@@ -273,29 +117,83 @@ const integrationEntries = computed(() => flattenPayload(props.alumni.integratio
                                 {{ alumni.alamat || '-' }}
                             </dd>
                         </div>
+
+                        <div v-if="alumni.tempat_lahir || alumni.tanggal_lahir" class="sm:col-span-2 border-t pt-4 mt-2">
+                            <h4 class="text-sm font-semibold text-gray-800 mb-3">Data Pribadi ( dari API)</h4>
+                        </div>
+                        <div v-if="alumni.tempat_lahir">
+                            <dt class="text-sm text-gray-500">Tempat Lahir</dt>
+                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.tempat_lahir }}</dd>
+                        </div>
+                        <div v-if="alumni.tanggal_lahir">
+                            <dt class="text-sm text-gray-500">Tanggal Lahir</dt>
+                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.tanggal_lahir }}</dd>
+                        </div>
+                        <div v-if="alumni.agama">
+                            <dt class="text-sm text-gray-500">Agama</dt>
+                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.agama }}</dd>
+                        </div>
+                        <div v-if="alumni.jenis_kelamin">
+                            <dt class="text-sm text-gray-500">Jenis Kelamin</dt>
+                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan' }}</dd>
+                        </div>
+                        <div v-if="alumni.no_ktp">
+                            <dt class="text-sm text-gray-500">No. KTP</dt>
+                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.no_ktp }}</dd>
+                        </div>
+
+                        <div v-if="alumni.ipk || alumni.predikat || alumni.judul_skripsi" class="sm:col-span-2 border-t pt-4 mt-2">
+                            <h4 class="text-sm font-semibold text-gray-800 mb-3">Data Akademik ( dari API)</h4>
+                        </div>
+                        <div v-if="alumni.ipk">
+                            <dt class="text-sm text-gray-500">IPK</dt>
+                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.ipk }}</dd>
+                        </div>
+                        <div v-if="alumni.predikat">
+                            <dt class="text-sm text-gray-500">Predikat</dt>
+                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.predikat }}</dd>
+                        </div>
+                        <div v-if="alumni.judul_skripsi" class="sm:col-span-2">
+                            <dt class="text-sm text-gray-500">Judul Skripsi/Tesis</dt>
+                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.judul_skripsi }}</dd>
+                        </div>
+                        <div v-if="alumni.pembimbing_1">
+                            <dt class="text-sm text-gray-500">Pembimbing 1</dt>
+                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.pembimbing_1 }}</dd>
+                        </div>
+                        <div v-if="alumni.pembimbing_2">
+                            <dt class="text-sm text-gray-500">Pembimbing 2</dt>
+                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.pembimbing_2 }}</dd>
+                        </div>
+
+                        <div v-if="alumni.ukuran_toga || alumni.status_bekerja !== null" class="sm:col-span-2 border-t pt-4 mt-2">
+                            <h4 class="text-sm font-semibold text-gray-800 mb-3">Data Wisuda ( dari API)</h4>
+                        </div>
+                        <div v-if="alumni.ukuran_toga">
+                            <dt class="text-sm text-gray-500">Ukuran Toga</dt>
+                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.ukuran_toga }}</dd>
+                        </div>
+                        <div v-if="alumni.status_bekerja !== null">
+                            <dt class="text-sm text-gray-500">Status Bekerja</dt>
+                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.status_bekerja ? 'Ya' : 'Tidak' }}</dd>
+                        </div>
+
+                        <div v-if="alumni.nama_ayah || alumni.nama_ibu || alumni.no_telepon_orang_tua" class="sm:col-span-2 border-t pt-4 mt-2">
+                            <h4 class="text-sm font-semibold text-gray-800 mb-3">Data Orang Tua ( dari API)</h4>
+                        </div>
+                        <div v-if="alumni.nama_ayah">
+                            <dt class="text-sm text-gray-500">Nama Ayah</dt>
+                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.nama_ayah }}</dd>
+                        </div>
+                        <div v-if="alumni.nama_ibu">
+                            <dt class="text-sm text-gray-500">Nama Ibu</dt>
+                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.nama_ibu }}</dd>
+                        </div>
+                        <div v-if="alumni.no_telepon_orang_tua">
+                            <dt class="text-sm text-gray-500">No. Telepon Orang Tua</dt>
+                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.no_telepon_orang_tua }}</dd>
+                        </div>
                     </dl>
-
-                    <div class="mt-8 rounded-md border border-gray-200 bg-gray-50 p-4">
-                        <h4 class="text-sm font-semibold text-gray-800">Data Integrasi Lengkap (API)</h4>
-                        <p class="mt-1 text-xs text-gray-600">
-                            Seluruh data tambahan dari API ditampilkan dalam format field, bukan JSON mentah.
-                        </p>
-
-                        <dl v-if="hasPayload && integrationEntries.length" class="mt-4 grid gap-4 sm:grid-cols-2">
-                            <div
-                                v-for="entry in integrationEntries"
-                                :key="entry.key"
-                                class="rounded-md border border-gray-200 bg-white p-3"
-                            >
-                                <dt class="text-xs font-medium text-gray-500">{{ entry.label }}</dt>
-                                <dd class="mt-1 text-sm font-medium text-gray-900">{{ entry.value }}</dd>
-                            </div>
-                        </dl>
-
-                        <p v-else class="mt-3 text-sm text-gray-500">
-                            Data integrasi API belum tersedia untuk alumni ini.
-                        </p>
-                    </div>
                 </div>
             </div>
         </div>

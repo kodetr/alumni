@@ -61,9 +61,15 @@ const activeAction = ref('');
 const databaseAction = ref('');
 const previewOnlyWithPhoto = ref(false);
 const photoFitMode = ref('cover');
-const bulkAngkatan = ref('');
 const fetchProgress = ref(0);
+const detailModalOpen = ref(false);
+const selectedDetailItem = ref(null);
 let fetchProgressTimer = null;
+
+const openDetailModal = (item) => {
+    selectedDetailItem.value = item;
+    detailModalOpen.value = true;
+};
 
 const fireSuccessAlert = (title, text = '') =>
     Swal.fire({
@@ -115,11 +121,6 @@ const openApiResultDialog = (result = props.integrationResult) => {
 };
 
 const hasPreviewRows = computed(() => alumniPreviewForm.records.length > 0);
-const isBulkAngkatanValid = computed(() => {
-    const numeric = Number(bulkAngkatan.value);
-
-    return Number.isInteger(numeric) && numeric >= 1900 && numeric <= 2100;
-});
 const visiblePreviewRows = computed(() => {
     if (!previewOnlyWithPhoto.value) {
         return alumniPreviewForm.records;
@@ -214,7 +215,7 @@ const extractPreviewRows = (result) => {
         .map((item) => {
             const nim = cleanString(item?.nim);
             const nama = cleanString(item?.full_name || item?.name);
-            const jurusan = cleanString(item?.study_program_name || item?.faculty_name || '-');
+            const jurisdiction = cleanString(item?.study_program_name || item?.faculty_name || '-');
 
             if (!nim || !nama) {
                 return null;
@@ -223,7 +224,7 @@ const extractPreviewRows = (result) => {
             return {
                 nim,
                 nama,
-                jurusan,
+                jurisdiction,
                 has_api_photo: Boolean(cleanString(item?.photo_path) || cleanString(item?.photo_3x4_path)),
                 photo_url:
                     toAbsolutePhotoUrl(item?.photo_path) ||
@@ -239,8 +240,27 @@ const extractPreviewRows = (result) => {
                         : item?.is_employed === false
                           ? 'Belum Bekerja'
                           : null,
+                organisasi: cleanString(item?.study_program_name) || null,
+                fakultas: cleanString(item?.faculty_name) || null,
                 instansi: null,
                 alamat: cleanString(item?.full_address) || null,
+
+                tempat_lahir: cleanString(item?.birth_place) || null,
+                tanggal_lahir: item?.birth_date || null,
+                agama: cleanString(item?.religion) || null,
+                jenis_kelamin: item?.gender || null,
+                no_ktp: cleanString(item?.ktp_number) || null,
+                ipk: item?.ipk || null,
+                predikat: cleanString(item?.predicate) || null,
+                judul_skripsi: cleanString(item?.thesis_title) || null,
+                pembimbing_1: cleanString(item?.supervisor_1) || null,
+                pembimbing_2: cleanString(item?.supervisor_2) || null,
+                ukuran_toga: cleanString(item?.gown_size) || null,
+                status_bekerja: item?.is_employed !== undefined ? item.is_employed : null,
+                nama_ayah: cleanString(item?.father_name) || null,
+                nama_ibu: cleanString(item?.mother_name) || null,
+                no_telepon_orang_tua: cleanString(item?.parent_phone) || null,
+
                 integration_payload: item,
             };
         })
@@ -256,17 +276,6 @@ watch(
 
         const rows = extractPreviewRows(result);
         alumniPreviewForm.records = rows;
-
-        const angkatanCandidates = rows
-            .map((row) => Number(row.angkatan))
-            .filter((value) => Number.isInteger(value) && value >= 1900 && value <= 2100);
-
-        if (!angkatanCandidates.length) {
-            bulkAngkatan.value = '';
-        } else {
-            const uniqueAngkatan = [...new Set(angkatanCandidates)];
-            bulkAngkatan.value = uniqueAngkatan.length === 1 ? uniqueAngkatan[0] : '';
-        }
 
         alumniPreviewForm.clearErrors();
     },
@@ -336,14 +345,6 @@ const savePreviewToAlumni = async () => {
         return;
     }
 
-    if (!isBulkAngkatanValid.value) {
-        fireErrorAlert('Angkatan belum valid', 'Isi 1 input angkatan dengan rentang tahun 1900-2100 sebelum menyimpan.');
-
-        return;
-    }
-
-    const normalizedAngkatan = Number(bulkAngkatan.value);
-
     const confirmation = await Swal.fire({
         icon: 'question',
         title: 'Simpan ke tabel alumni?',
@@ -365,15 +366,34 @@ const savePreviewToAlumni = async () => {
         records: visiblePreviewRows.value.map((item) => ({
                 nim: item.nim,
                 nama: item.nama,
-                jurusan: item.jurusan,
-                angkatan: normalizedAngkatan,
+              jurisdiction: item.jurusan,
+                angkatan: item.tahun_lulus,
                 email: item.email,
                 photo_url: item.has_api_photo ? item.photo_url : null,
                 no_telepon: item.no_telepon,
                 tahun_lulus: item.tahun_lulus,
                 pekerjaan: item.pekerjaan,
+                organisasi: item.organisasi,
+                fakultas: item.fakultas,
                 instansi: item.instansi,
                 alamat: item.alamat,
+
+                tempat_lahir: item.tempat_lahir,
+                tanggal_lahir: item.tanggal_lahir,
+                agama: item.agama,
+                jenis_kelamin: item.jenis_kelamin,
+                no_ktp: item.no_ktp,
+                ipk: item.ipk,
+                predikat: item.predikat,
+                judul_skripsi: item.judul_skripsi,
+                pembimbing_1: item.pembimbing_1,
+                pembimbing_2: item.pembimbing_2,
+                ukuran_toga: item.ukuran_toga,
+                status_bekerja: item.status_bekerja,
+                nama_ayah: item.nama_ayah,
+                nama_ibu: item.nama_ibu,
+                no_telepon_orang_tua: item.no_telepon_orang_tua,
+
                 integration_payload: item.integration_payload,
         })),
     }))
@@ -732,40 +752,17 @@ onBeforeUnmount(() => {
                         <div>
                             <h3 class="text-lg font-semibold text-gray-900">Preview Data Alumni</h3>
                             <p class="mt-1 text-sm text-gray-600">
-                                Cek hasil data API terlebih dahulu, isi angkatan alumni, lalu simpan ke tabel alumni.
+                                Cek hasil data API terlebih dahulu, lalu simpan ke tabel alumni.
                             </p>
                         </div>
                         <button
                             type="button"
                             class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
-                            :disabled="!visiblePreviewRows.length || alumniPreviewForm.processing || !isBulkAngkatanValid"
+                            :disabled="!visiblePreviewRows.length || alumniPreviewForm.processing"
                             @click="savePreviewToAlumni"
                         >
                             {{ activeAction === 'store-alumni' ? 'Menyimpan data...' : 'Simpan ke Data Alumni' }}
                         </button>
-                    </div>
-
-                    <div v-if="hasPreviewRows" class="mt-4 rounded-md border border-indigo-200 bg-indigo-50 px-4 py-3">
-                        <label for="bulk_angkatan" class="mb-1 block text-sm font-semibold text-indigo-800">
-                            Angkatan Alumni (1 input untuk semua data)
-                        </label>
-                        <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-                            <input
-                                id="bulk_angkatan"
-                                v-model.number="bulkAngkatan"
-                                type="number"
-                                min="1900"
-                                max="2100"
-                                class="w-40 rounded-md border-indigo-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                placeholder="Contoh 2023"
-                            />
-                            <p class="text-xs text-indigo-700">
-                                Nilai ini akan dipakai untuk semua alumni hasil API yang disimpan.
-                            </p>
-                        </div>
-                        <p v-if="bulkAngkatan !== '' && !isBulkAngkatanValid" class="mt-2 text-xs text-red-600">
-                            Angkatan harus berupa tahun valid antara 1900 sampai 2100.
-                        </p>
                     </div>
 
                     <div v-if="hasPreviewRows" class="mt-4 flex flex-col gap-3 rounded-md border border-gray-200 bg-gray-50 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -818,7 +815,10 @@ onBeforeUnmount(() => {
                                     <th class="px-4 py-3 text-left font-semibold text-gray-700">NIM</th>
                                     <th class="px-4 py-3 text-left font-semibold text-gray-700">Nama</th>
                                     <th class="px-4 py-3 text-left font-semibold text-gray-700">Jurusan</th>
-                                    <th class="px-4 py-3 text-left font-semibold text-gray-700">Angkatan</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-gray-700">Program Studi</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-gray-700">Fakultas</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-gray-700">Tahun Lulus</th>
+                                    <th class="px-4 py-3 text-center font-semibold text-gray-700">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100 bg-white">
@@ -837,7 +837,18 @@ onBeforeUnmount(() => {
                                     <td class="px-4 py-3 font-medium text-gray-800">{{ item.nim }}</td>
                                     <td class="px-4 py-3 text-gray-700">{{ item.nama }}</td>
                                     <td class="px-4 py-3 text-gray-600">{{ item.jurusan }}</td>
-                                    <td class="px-4 py-3 text-sm font-semibold text-slate-700">{{ bulkAngkatan || '-' }}</td>
+                                    <td class="px-4 py-3 text-gray-600">{{ item.organisasi || '-' }}</td>
+                                    <td class="px-4 py-3 text-gray-600">{{ item.fakultas || '-' }}</td>
+                                    <td class="px-4 py-3 text-sm font-semibold text-slate-700">{{ item.tahun_lulus || '-' }}</td>
+                                    <td class="px-4 py-3 text-center">
+                                        <button
+                                            type="button"
+                                            class="rounded-md bg-indigo-100 px-3 py-1.5 text-xs font-medium text-indigo-700 transition hover:bg-indigo-200"
+                                            @click="openDetailModal(item)"
+                                        >
+                                            Detail
+                                        </button>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
@@ -848,6 +859,161 @@ onBeforeUnmount(() => {
                         class="mt-6 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700"
                     >
                         Tidak ada data dengan foto API sesuai filter.
+                    </div>
+                </div>
+
+                <div
+                    v-if="detailModalOpen"
+                    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+                    @click.self="detailModalOpen = false"
+                >
+                    <div class="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
+                        <div class="flex items-center justify-between border-b pb-4">
+                            <h3 class="text-lg font-semibold text-gray-900">Detail Alumni</h3>
+                            <button
+                                type="button"
+                                class="text-gray-400 hover:text-gray-600"
+                                @click="detailModalOpen = false"
+                            >
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div v-if="selectedDetailItem" class="mt-4 grid gap-4 sm:grid-cols-2">
+                            <div class="sm:col-span-2 flex gap-4">
+                                <img
+                                    v-if="selectedDetailItem.photo_url"
+                                    :src="selectedDetailItem.photo_url"
+                                    alt="Foto alumni"
+                                    class="h-32 w-24 rounded-md border border-gray-200 object-cover"
+                                />
+                                <div class="flex flex-col justify-center">
+                                    <p class="text-sm text-gray-500">NIM</p>
+                                    <p class="font-medium text-gray-900">{{ selectedDetailItem.nim }}</p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <p class="text-xs text-gray-500">Nama</p>
+                                <p class="font-medium text-gray-900">{{ selectedDetailItem.nama }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">Jurusan</p>
+                                <p class="font-medium text-gray-900">{{ selectedDetailItem.jurusan }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">Program Studi</p>
+                                <p class="font-medium text-gray-900">{{ selectedDetailItem.organisasi || '-' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">Fakultas</p>
+                                <p class="font-medium text-gray-900">{{ selectedDetailItem.fakultas || '-' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">Tahun Lulus</p>
+                                <p class="font-medium text-gray-900">{{ selectedDetailItem.tahun_lulus || '-' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">Email</p>
+                                <p class="font-medium text-gray-900">{{ selectedDetailItem.email || '-' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">Tempat Lahir</p>
+                                <p class="font-medium text-gray-900">{{ selectedDetailItem.tempat_lahir || '-' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">Tanggal Lahir</p>
+                                <p class="font-medium text-gray-900">{{ selectedDetailItem.tanggal_lahir || '-' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">Agama</p>
+                                <p class="font-medium text-gray-900">{{ selectedDetailItem.agama || '-' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">Jenis Kelamin</p>
+                                <p class="font-medium text-gray-900">
+                                    {{ selectedDetailItem.jenis_kelamin === 'L' ? 'Laki-laki' : selectedDetailItem.jenis_kelamin === 'P' ? 'Perempuan' : '-' }}
+                                </p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">No. KTP</p>
+                                <p class="font-medium text-gray-900">{{ selectedDetailItem.no_ktp || '-' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">No. Telepon</p>
+                                <p class="font-medium text-gray-900">{{ selectedDetailItem.no_telepon || '-' }}</p>
+                            </div>
+                            <div class="sm:col-span-2">
+                                <p class="text-xs text-gray-500">Alamat</p>
+                                <p class="font-medium text-gray-900">{{ selectedDetailItem.alamat || '-' }}</p>
+                            </div>
+
+                            <div class="sm:col-span-2 border-t pt-4 mt-2">
+                                <h4 class="text-sm font-semibold text-gray-800 mb-3">Data Akademik</h4>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">IPK</p>
+                                <p class="font-medium text-gray-900">{{ selectedDetailItem.ipk || '-' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">Predikat</p>
+                                <p class="font-medium text-gray-900">{{ selectedDetailItem.predikat || '-' }}</p>
+                            </div>
+                            <div class="sm:col-span-2">
+                                <p class="text-xs text-gray-500">Judul Skripsi/Tesis</p>
+                                <p class="font-medium text-gray-900">{{ selectedDetailItem.judul_skripsi || '-' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">Pembimbing 1</p>
+                                <p class="font-medium text-gray-900">{{ selectedDetailItem.pembimbing_1 || '-' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">Pembimbing 2</p>
+                                <p class="font-medium text-gray-900">{{ selectedDetailItem.pembimbing_2 || '-' }}</p>
+                            </div>
+
+                            <div class="sm:col-span-2 border-t pt-4 mt-2">
+                                <h4 class="text-sm font-semibold text-gray-800 mb-3">Data Wisuda</h4>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">Ukuran Toga</p>
+                                <p class="font-medium text-gray-900">{{ selectedDetailItem.ukuran_toga || '-' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">Status Bekerja</p>
+                                <p class="font-medium text-gray-900">
+                                    {{ selectedDetailItem.status_bekerja === true ? 'Ya' : selectedDetailItem.status_bekerja === false ? 'Tidak' : '-' }}
+                                </p>
+                            </div>
+
+                            <div class="sm:col-span-2 border-t pt-4 mt-2">
+                                <h4 class="text-sm font-semibold text-gray-800 mb-3">Data Orang Tua</h4>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">Nama Ayah</p>
+                                <p class="font-medium text-gray-900">{{ selectedDetailItem.nama_ayah || '-' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">Nama Ibu</p>
+                                <p class="font-medium text-gray-900">{{ selectedDetailItem.nama_ibu || '-' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">No. Telepon Orang Tua</p>
+                                <p class="font-medium text-gray-900">{{ selectedDetailItem.no_telepon_orang_tua || '-' }}</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 flex justify-end">
+                            <button
+                                type="button"
+                                class="rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-200"
+                                @click="detailModalOpen = false"
+                            >
+                                Tutup
+                            </button>
+                        </div>
                     </div>
                 </div>
 
