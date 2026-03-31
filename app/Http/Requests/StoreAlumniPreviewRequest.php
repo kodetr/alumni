@@ -29,11 +29,13 @@ class StoreAlumniPreviewRequest extends FormRequest
             'records.*.jurusan' => ['required', 'string', 'max:255'],
             'records.*.angkatan' => ['required', 'integer', 'between:1900,2100'],
             'records.*.email' => ['nullable', 'email', 'max:255'],
+            'records.*.photo_url' => ['nullable', 'string', 'max:2048'],
             'records.*.no_telepon' => ['nullable', 'string', 'max:30'],
             'records.*.tahun_lulus' => ['nullable', 'integer', 'between:1900,2100'],
             'records.*.pekerjaan' => ['nullable', 'string', 'max:255'],
             'records.*.instansi' => ['nullable', 'string', 'max:255'],
             'records.*.alamat' => ['nullable', 'string'],
+            'records.*.integration_payload' => ['nullable', 'array'],
         ];
     }
 

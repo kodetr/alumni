@@ -61,6 +61,7 @@ const activeAction = ref('');
 const databaseAction = ref('');
 const previewOnlyWithPhoto = ref(false);
 const photoFitMode = ref('cover');
+const bulkAngkatan = ref('');
 const fetchProgress = ref(0);
 let fetchProgressTimer = null;
 
@@ -114,6 +115,11 @@ const openApiResultDialog = (result = props.integrationResult) => {
 };
 
 const hasPreviewRows = computed(() => alumniPreviewForm.records.length > 0);
+const isBulkAngkatanValid = computed(() => {
+    const numeric = Number(bulkAngkatan.value);
+
+    return Number.isInteger(numeric) && numeric >= 1900 && numeric <= 2100;
+});
 const visiblePreviewRows = computed(() => {
     if (!previewOnlyWithPhoto.value) {
         return alumniPreviewForm.records;
@@ -235,6 +241,7 @@ const extractPreviewRows = (result) => {
                           : null,
                 instansi: null,
                 alamat: cleanString(item?.full_address) || null,
+                integration_payload: item,
             };
         })
         .filter((item) => item !== null);
@@ -247,7 +254,20 @@ watch(
             return;
         }
 
-        alumniPreviewForm.records = extractPreviewRows(result);
+        const rows = extractPreviewRows(result);
+        alumniPreviewForm.records = rows;
+
+        const angkatanCandidates = rows
+            .map((row) => Number(row.angkatan))
+            .filter((value) => Number.isInteger(value) && value >= 1900 && value <= 2100);
+
+        if (!angkatanCandidates.length) {
+            bulkAngkatan.value = '';
+        } else {
+            const uniqueAngkatan = [...new Set(angkatanCandidates)];
+            bulkAngkatan.value = uniqueAngkatan.length === 1 ? uniqueAngkatan[0] : '';
+        }
+
         alumniPreviewForm.clearErrors();
     },
     { immediate: true },
@@ -294,7 +314,10 @@ const submit = () => {
                 return;
             }
 
-            fireSuccessAlert('Ambil data berhasil', page.props.flash?.success ?? 'Data menu berhasil diambil dari API.');
+            fireSuccessAlert('Ambil data berhasil', page.props.flash?.success ?? 'Data alumni berhasil diambil dari API.')
+                .then(() => {
+                    openApiResultDialog(page.props.integrationResult);
+                });
         },
         onError: () => {
             fireErrorAlert('Validasi gagal', 'Periksa endpoint dan API key lalu coba lagi.');
@@ -306,8 +329,6 @@ const submit = () => {
     });
 };
 
-const previewError = (index, field) => alumniPreviewForm.errors[`records.${index}.${field}`] ?? '';
-
 const savePreviewToAlumni = async () => {
     if (!visiblePreviewRows.value.length) {
         fireErrorAlert('Data preview kosong', 'Ambil data API terlebih dahulu sebelum menyimpan ke tabel alumni.');
@@ -315,13 +336,13 @@ const savePreviewToAlumni = async () => {
         return;
     }
 
-    const invalidAngkatan = visiblePreviewRows.value.find((record) => !record.angkatan);
-
-    if (invalidAngkatan) {
-        fireErrorAlert('Angkatan belum lengkap', 'Isi angkatan untuk semua data alumni sebelum disimpan.');
+    if (!isBulkAngkatanValid.value) {
+        fireErrorAlert('Angkatan belum valid', 'Isi 1 input angkatan dengan rentang tahun 1900-2100 sebelum menyimpan.');
 
         return;
     }
+
+    const normalizedAngkatan = Number(bulkAngkatan.value);
 
     const confirmation = await Swal.fire({
         icon: 'question',
@@ -341,19 +362,21 @@ const savePreviewToAlumni = async () => {
     activeAction.value = 'store-alumni';
 
     alumniPreviewForm.transform(() => ({
-            records: visiblePreviewRows.value.map((item) => ({
+        records: visiblePreviewRows.value.map((item) => ({
                 nim: item.nim,
                 nama: item.nama,
                 jurusan: item.jurusan,
-                angkatan: item.angkatan,
+                angkatan: normalizedAngkatan,
                 email: item.email,
+                photo_url: item.has_api_photo ? item.photo_url : null,
                 no_telepon: item.no_telepon,
                 tahun_lulus: item.tahun_lulus,
                 pekerjaan: item.pekerjaan,
                 instansi: item.instansi,
                 alamat: item.alamat,
-            })),
-        }))
+                integration_payload: item.integration_payload,
+        })),
+    }))
         .post(route('settings.integration.store-alumni'), {
         preserveScroll: true,
         onSuccess: (page) => {
@@ -678,16 +701,27 @@ onBeforeUnmount(() => {
                     v-if="integrationResult"
                     class="rounded-lg bg-white p-6 shadow-sm"
                 >
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <h3 class="text-lg font-semibold text-gray-900">Hasil Respons API</h3>
-                        <div class="text-xs text-gray-500">
-                            <p>Endpoint: {{ integrationResult.endpoint }}</p>
-                            <p>Waktu Ambil: {{ integrationResult.fetched_at }}</p>
-                            <p v-if="integrationStatus">HTTP Status: {{ integrationStatus }}</p>
+                    <div class="flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900">Hasil Respons API</h3>
+                            <p class="mt-1 text-sm text-gray-600">
+                                Hasil detail respons API ditampilkan dalam dialog.
+                            </p>
                         </div>
+                        <button
+                            type="button"
+                            class="rounded-md bg-slate-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-600"
+                            @click="openApiResultDialog()"
+                        >
+                            Lihat Dialog Respons
+                        </button>
                     </div>
 
-                    <pre class="mt-4 overflow-x-auto rounded-md bg-gray-900 p-4 text-xs leading-relaxed text-gray-100">{{ formattedResult }}</pre>
+                    <div class="mt-4 text-xs text-gray-500">
+                        <p>Endpoint: {{ integrationResult.endpoint }}</p>
+                        <p>Waktu Ambil: {{ integrationResult.fetched_at }}</p>
+                        <p v-if="integrationStatus">HTTP Status: {{ integrationStatus }}</p>
+                    </div>
                 </div>
 
                 <div
@@ -704,11 +738,34 @@ onBeforeUnmount(() => {
                         <button
                             type="button"
                             class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
-                            :disabled="!visiblePreviewRows.length || alumniPreviewForm.processing"
+                            :disabled="!visiblePreviewRows.length || alumniPreviewForm.processing || !isBulkAngkatanValid"
                             @click="savePreviewToAlumni"
                         >
                             {{ activeAction === 'store-alumni' ? 'Menyimpan data...' : 'Simpan ke Data Alumni' }}
                         </button>
+                    </div>
+
+                    <div v-if="hasPreviewRows" class="mt-4 rounded-md border border-indigo-200 bg-indigo-50 px-4 py-3">
+                        <label for="bulk_angkatan" class="mb-1 block text-sm font-semibold text-indigo-800">
+                            Angkatan Alumni (1 input untuk semua data)
+                        </label>
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <input
+                                id="bulk_angkatan"
+                                v-model.number="bulkAngkatan"
+                                type="number"
+                                min="1900"
+                                max="2100"
+                                class="w-40 rounded-md border-indigo-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                placeholder="Contoh 2023"
+                            />
+                            <p class="text-xs text-indigo-700">
+                                Nilai ini akan dipakai untuk semua alumni hasil API yang disimpan.
+                            </p>
+                        </div>
+                        <p v-if="bulkAngkatan !== '' && !isBulkAngkatanValid" class="mt-2 text-xs text-red-600">
+                            Angkatan harus berupa tahun valid antara 1900 sampai 2100.
+                        </p>
                     </div>
 
                     <div v-if="hasPreviewRows" class="mt-4 flex flex-col gap-3 rounded-md border border-gray-200 bg-gray-50 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -780,19 +837,7 @@ onBeforeUnmount(() => {
                                     <td class="px-4 py-3 font-medium text-gray-800">{{ item.nim }}</td>
                                     <td class="px-4 py-3 text-gray-700">{{ item.nama }}</td>
                                     <td class="px-4 py-3 text-gray-600">{{ item.jurusan }}</td>
-                                    <td class="px-4 py-3">
-                                        <input
-                                            v-model.number="item.angkatan"
-                                            type="number"
-                                            min="1900"
-                                            max="2100"
-                                            class="w-28 rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                            placeholder="Contoh 2023"
-                                        />
-                                        <p v-if="previewError(index, 'angkatan')" class="mt-1 text-xs text-red-600">
-                                            {{ previewError(index, 'angkatan') }}
-                                        </p>
-                                    </td>
+                                    <td class="px-4 py-3 text-sm font-semibold text-slate-700">{{ bulkAngkatan || '-' }}</td>
                                 </tr>
                             </tbody>
                         </table>

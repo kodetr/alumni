@@ -55,7 +55,7 @@ class IntegrationSettingsTest extends TestCase
         $response
             ->assertRedirect(route('settings.integration.index'))
             ->assertSessionHas('integrationResult')
-            ->assertSessionHas('success', 'Data menu berhasil diambil dari API.');
+            ->assertSessionHas('success', 'Data alumni berhasil diambil dari API (0 data).');
 
         Http::assertSent(function ($request): bool {
             return $request->url() === 'http://127.0.0.1:8001/api/integration/alumni/menu-data'
@@ -95,6 +95,60 @@ class IntegrationSettingsTest extends TestCase
             'id' => 1,
             'endpoint' => 'http://127.0.0.1:8001/api/integration/alumni/menu-data',
         ]);
+    }
+
+    public function test_fetch_aggregates_all_pagination_pages_before_preview(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        Http::fake([
+            'http://127.0.0.1:8001/api/integration/alumni/menu-data?page=2' => Http::response([
+                'pagination' => [
+                    'current_page' => 2,
+                    'last_page' => 2,
+                    'path' => 'http://127.0.0.1:8001/api/integration/alumni/menu-data',
+                    'data' => [
+                        [
+                            'nim' => '2300000002',
+                            'full_name' => 'Wisudawan 2',
+                            'study_program_name' => 'Administrasi Publik',
+                        ],
+                    ],
+                ],
+            ], 200),
+            'http://127.0.0.1:8001/api/integration/alumni/menu-data' => Http::response([
+                'pagination' => [
+                    'current_page' => 1,
+                    'last_page' => 2,
+                    'path' => 'http://127.0.0.1:8001/api/integration/alumni/menu-data',
+                    'data' => [
+                        [
+                            'nim' => '2300000001',
+                            'full_name' => 'Wisudawan 1',
+                            'study_program_name' => 'Teknik Industri',
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $response = $this
+            ->actingAs($admin)
+            ->post(route('settings.integration.fetch'), [
+                'endpoint' => 'http://127.0.0.1:8001/api/integration/alumni/menu-data',
+                'api_key' => 'alumni_test_api_key',
+            ]);
+
+        $response
+            ->assertRedirect(route('settings.integration.index'))
+            ->assertSessionHas('success', 'Data alumni berhasil diambil dari API (2 data).')
+            ->assertSessionHas('integrationResult', function (array $payload): bool {
+                $rows = $payload['data']['pagination']['data'] ?? [];
+
+                return is_array($rows) && count($rows) === 2;
+            });
+
+        Http::assertSentCount(2);
     }
 
     public function test_admin_can_save_endpoint_and_api_key_configuration(): void
@@ -199,11 +253,16 @@ class IntegrationSettingsTest extends TestCase
                         'jurusan' => 'Teknik Industri',
                         'angkatan' => 2023,
                         'email' => 'wisudawan1@example.com',
+                        'photo_url' => 'https://cdn.example.com/photos/2300000001.jpg',
                         'no_telepon' => '08123456789',
                         'tahun_lulus' => 2026,
                         'pekerjaan' => null,
                         'instansi' => null,
                         'alamat' => 'Bandung',
+                        'integration_payload' => [
+                            'full_name' => 'Wisudawan 1',
+                            'photo_path' => '/storage/photos/2300000001.jpg',
+                        ],
                     ],
                     [
                         'nim' => '2300000002',
@@ -216,6 +275,9 @@ class IntegrationSettingsTest extends TestCase
                         'pekerjaan' => null,
                         'instansi' => null,
                         'alamat' => null,
+                        'integration_payload' => [
+                            'full_name' => 'Wisudawan 2',
+                        ],
                     ],
                 ],
             ]);
@@ -230,6 +292,7 @@ class IntegrationSettingsTest extends TestCase
             'jurusan' => 'Teknik Industri',
             'angkatan' => 2023,
             'tahun_lulus' => 2026,
+            'photo_url' => 'https://cdn.example.com/photos/2300000001.jpg',
         ]);
 
         $this->assertDatabaseCount('alumni', 2);

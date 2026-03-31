@@ -6,6 +6,7 @@ use App\Http\Requests\FetchIntegrationMenuDataRequest;
 use App\Http\Requests\StoreAlumniPreviewRequest;
 use App\Models\Alumni;
 use App\Models\IntegrationSetting;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -135,6 +136,7 @@ class IntegrationSettingsController extends Controller
                         [
                             'nama' => trim((string) $record['nama']),
                             'email' => $email,
+                            'photo_url' => $this->nullableString($record['photo_url'] ?? null),
                             'no_telepon' => $this->nullableString($record['no_telepon'] ?? null),
                             'jurusan' => trim((string) $record['jurusan']),
                             'angkatan' => (int) $record['angkatan'],
@@ -142,6 +144,9 @@ class IntegrationSettingsController extends Controller
                             'pekerjaan' => $this->nullableString($record['pekerjaan'] ?? null),
                             'instansi' => $this->nullableString($record['instansi'] ?? null),
                             'alamat' => $this->nullableString($record['alamat'] ?? null),
+                            'integration_payload' => isset($record['integration_payload']) && is_array($record['integration_payload'])
+                                ? $record['integration_payload']
+                                : null,
                         ],
                     );
 
@@ -170,13 +175,8 @@ class IntegrationSettingsController extends Controller
         $this->saveIntegrationConfig($validated['endpoint'], $validated['api_key']);
 
         try {
-            $response = Http::timeout(20)
-                ->acceptJson()
-                ->withHeaders([
-                    'X-API-KEY' => $validated['api_key'],
-                    'Authorization' => 'Bearer '.$validated['api_key'],
-                ])
-                ->get($validated['endpoint']);
+            $http = $this->integrationHttpClient($validated['api_key']);
+            $response = $http->get($validated['endpoint']);
 
             if (! $response->successful()) {
                 $defaultMessage = "Gagal mengambil data dari API (HTTP {$response->status()}).";
@@ -191,15 +191,23 @@ class IntegrationSettingsController extends Controller
                     ->with('integrationError', $message);
             }
 
+            $payload = $response->json();
+            $aggregatedPayload = $this->aggregatePaginatedApiPayload(
+                $http,
+                $validated['endpoint'],
+                is_array($payload) ? $payload : [],
+            );
+            $totalRecords = $this->extractTotalRecords($aggregatedPayload);
+
             $this->storeConnectionStatus(true, $response->status(), $validated['endpoint'], 'Data menu berhasil diambil dari API.');
 
             return to_route('settings.integration.index')
-                ->with('success', 'Data menu berhasil diambil dari API.')
+                ->with('success', "Data alumni berhasil diambil dari API ({$totalRecords} data).")
                 ->with('integrationStatus', $response->status())
                 ->with('integrationResult', [
                     'fetched_at' => now()->toDateTimeString(),
                     'endpoint' => $validated['endpoint'],
-                    'data' => $response->json(),
+                    'data' => $aggregatedPayload,
                 ]);
         } catch (Throwable) {
             $this->storeConnectionStatus(
@@ -313,6 +321,98 @@ class IntegrationSettingsController extends Controller
     private function statusCacheKey(): string
     {
         return (string) config('integration.status_cache_key', 'integration.menu_data.connection_status');
+    }
+
+    private function integrationHttpClient(string $apiKey): PendingRequest
+    {
+        return Http::timeout(20)
+            ->acceptJson()
+            ->withHeaders([
+                'X-API-KEY' => $apiKey,
+                'Authorization' => 'Bearer '.$apiKey,
+            ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function aggregatePaginatedApiPayload(PendingRequest $http, string $endpoint, array $payload): array
+    {
+        $pagination = $payload['pagination'] ?? null;
+
+        if (! is_array($pagination)) {
+            return $payload;
+        }
+
+        $firstPageRows = $pagination['data'] ?? [];
+
+        if (! is_array($firstPageRows)) {
+            return $payload;
+        }
+
+        $currentPage = (int) ($pagination['current_page'] ?? 1);
+        $lastPage = (int) ($pagination['last_page'] ?? $currentPage);
+
+        if ($lastPage <= $currentPage) {
+            return $payload;
+        }
+
+        $allRows = $firstPageRows;
+        $path = is_string($pagination['path'] ?? null) && $pagination['path'] !== ''
+            ? (string) $pagination['path']
+            : $endpoint;
+
+        for ($page = $currentPage + 1; $page <= $lastPage; $page++) {
+            $nextResponse = $http->get($path, ['page' => $page]);
+
+            if (! $nextResponse->successful()) {
+                throw new RuntimeException("Gagal mengambil halaman API ke-{$page} (HTTP {$nextResponse->status()}).");
+            }
+
+            $nextPayload = $nextResponse->json();
+
+            if (! is_array($nextPayload)) {
+                continue;
+            }
+
+            $nextPagination = $nextPayload['pagination'] ?? null;
+            $nextRows = is_array($nextPagination) && is_array($nextPagination['data'] ?? null)
+                ? $nextPagination['data']
+                : [];
+
+            if ($nextRows !== []) {
+                $allRows = [...$allRows, ...$nextRows];
+            }
+        }
+
+        $payload['pagination']['data'] = $allRows;
+        $payload['pagination']['current_page'] = 1;
+        $payload['pagination']['last_page'] = 1;
+        $payload['pagination']['per_page'] = max(1, count($allRows));
+        $payload['pagination']['total'] = count($allRows);
+        $payload['pagination']['from'] = count($allRows) > 0 ? 1 : null;
+        $payload['pagination']['to'] = count($allRows) > 0 ? count($allRows) : null;
+
+        return $payload;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function extractTotalRecords(array $payload): int
+    {
+        $pagination = $payload['pagination'] ?? null;
+
+        if (is_array($pagination) && is_array($pagination['data'] ?? null)) {
+            return count($pagination['data']);
+        }
+
+        if (is_array($payload['data'] ?? null)) {
+            return count($payload['data']);
+        }
+
+        return 0;
     }
 
     /**

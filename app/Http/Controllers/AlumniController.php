@@ -20,24 +20,29 @@ class AlumniController extends Controller
         $search = $request->string('search')->toString();
         $angkatan = $request->string('angkatan')->toString();
         $jurusan = $request->string('jurusan')->toString();
+        $perPageOptions = [20, 30, 50, 100];
+        $perPage = (int) $request->integer('per_page', 20);
+
+        if (! in_array($perPage, $perPageOptions, true)) {
+            $perPage = 20;
+        }
 
         $alumni = Alumni::query()
+            ->select(['id', 'nim', 'nama', 'jurusan', 'angkatan', 'email'])
             ->when($search, function ($query, $searchValue) {
                 $query->where(function ($searchQuery) use ($searchValue): void {
                     $searchQuery
                         ->where('nama', 'like', "%{$searchValue}%")
                         ->orWhere('nim', 'like', "%{$searchValue}%")
                         ->orWhere('email', 'like', "%{$searchValue}%")
-                        ->orWhere('jurusan', 'like', "%{$searchValue}%")
-                        ->orWhere('pekerjaan', 'like', "%{$searchValue}%")
-                        ->orWhere('instansi', 'like', "%{$searchValue}%");
+                        ->orWhere('jurusan', 'like', "%{$searchValue}%");
                 });
             })
             ->when($angkatan, fn ($query, $angkatanValue) => $query->where('angkatan', $angkatanValue))
             ->when($jurusan, fn ($query, $jurusanValue) => $query->where('jurusan', $jurusanValue))
             ->orderByDesc('angkatan')
             ->orderBy('nama')
-            ->paginate(10)
+            ->paginate($perPage)
             ->withQueryString();
 
         return Inertia::render('Alumni/Index', [
@@ -46,7 +51,9 @@ class AlumniController extends Controller
                 'search' => $search,
                 'angkatan' => $angkatan,
                 'jurusan' => $jurusan,
+                'per_page' => $perPage,
             ],
+            'perPageOptions' => $perPageOptions,
             'angkatanOptions' => Alumni::query()
                 ->select('angkatan')
                 ->distinct()

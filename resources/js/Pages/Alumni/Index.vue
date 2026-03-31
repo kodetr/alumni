@@ -14,7 +14,12 @@ const props = defineProps({
             search: '',
             angkatan: '',
             jurusan: '',
+            per_page: 20,
         }),
+    },
+    perPageOptions: {
+        type: Array,
+        default: () => [20, 30, 50, 100],
     },
     angkatanOptions: {
         type: Array,
@@ -30,6 +35,7 @@ const filterForm = reactive({
     search: props.filters.search ?? '',
     angkatan: props.filters.angkatan ?? '',
     jurusan: props.filters.jurusan ?? '',
+    per_page: String(props.filters.per_page ?? 20),
 });
 
 const submitFilters = () => {
@@ -43,6 +49,7 @@ const resetFilters = () => {
     filterForm.search = '';
     filterForm.angkatan = '';
     filterForm.jurusan = '';
+    filterForm.per_page = '20';
     submitFilters();
 };
 
@@ -75,7 +82,7 @@ const destroy = (id, nama) => {
             <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
                 <div class="rounded-lg bg-white p-4 shadow-sm">
                     <form
-                        class="grid gap-4 md:grid-cols-4"
+                        class="grid gap-4 md:grid-cols-5"
                         @submit.prevent="submitFilters"
                     >
                         <div class="md:col-span-2">
@@ -85,7 +92,7 @@ const destroy = (id, nama) => {
                             <input
                                 v-model="filterForm.search"
                                 type="text"
-                                placeholder="Nama, NIM, jurusan, pekerjaan"
+                                placeholder="Nama, NIM, jurusan, email"
                                 class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                             />
                         </div>
@@ -128,7 +135,26 @@ const destroy = (id, nama) => {
                             </select>
                         </div>
 
-                        <div class="md:col-span-4 flex flex-wrap gap-2">
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-gray-700">
+                                Tampilkan
+                            </label>
+                            <select
+                                v-model="filterForm.per_page"
+                                class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                @change="submitFilters"
+                            >
+                                <option
+                                    v-for="size in perPageOptions"
+                                    :key="size"
+                                    :value="String(size)"
+                                >
+                                    {{ size }} data
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="md:col-span-5 flex flex-wrap gap-2">
                             <button
                                 type="submit"
                                 class="rounded-md bg-gray-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-700"
@@ -151,11 +177,11 @@ const destroy = (id, nama) => {
                         <table class="min-w-full divide-y divide-gray-200 text-sm">
                             <thead class="bg-gray-50">
                                 <tr>
-                                    <th class="px-4 py-3 text-left font-semibold text-gray-600">Nama</th>
                                     <th class="px-4 py-3 text-left font-semibold text-gray-600">NIM</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-gray-600">Nama</th>
                                     <th class="px-4 py-3 text-left font-semibold text-gray-600">Jurusan</th>
                                     <th class="px-4 py-3 text-left font-semibold text-gray-600">Angkatan</th>
-                                    <th class="px-4 py-3 text-left font-semibold text-gray-600">Kontak</th>
+                                    <th class="px-4 py-3 text-left font-semibold text-gray-600">Email</th>
                                     <th class="px-4 py-3 text-left font-semibold text-gray-600">Aksi</th>
                                 </tr>
                             </thead>
@@ -165,14 +191,11 @@ const destroy = (id, nama) => {
                                     :key="item.id"
                                     class="hover:bg-gray-50"
                                 >
-                                    <td class="px-4 py-3 text-gray-900">{{ item.nama }}</td>
                                     <td class="px-4 py-3 text-gray-700">{{ item.nim }}</td>
+                                    <td class="px-4 py-3 text-gray-900">{{ item.nama }}</td>
                                     <td class="px-4 py-3 text-gray-700">{{ item.jurusan }}</td>
                                     <td class="px-4 py-3 text-gray-700">{{ item.angkatan }}</td>
-                                    <td class="px-4 py-3 text-gray-700">
-                                        <div>{{ item.email || '-' }}</div>
-                                        <div class="text-xs text-gray-500">{{ item.no_telepon || '-' }}</div>
-                                    </td>
+                                    <td class="px-4 py-3 text-gray-700">{{ item.email || '-' }}</td>
                                     <td class="px-4 py-3">
                                         <div class="flex flex-wrap gap-2">
                                             <Link

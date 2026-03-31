@@ -15,6 +15,7 @@ class Alumni extends Model
         'nama',
         'nim',
         'email',
+        'photo_url',
         'no_telepon',
         'jurusan',
         'angkatan',
@@ -22,6 +23,7 @@ class Alumni extends Model
         'pekerjaan',
         'instansi',
         'alamat',
+        'integration_payload',
     ];
 
     /**
@@ -30,5 +32,6 @@ class Alumni extends Model
     protected $casts = [
         'angkatan' => 'integer',
         'tahun_lulus' => 'integer',
+        'integration_payload' => 'array',
     ];
 }
