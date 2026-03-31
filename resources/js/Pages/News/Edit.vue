@@ -7,6 +7,7 @@ import RichTextEditor from '@/Components/RichTextEditor.vue';
 import TextInput from '@/Components/TextInput.vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
+import Swal from 'sweetalert2';
 import { computed, onBeforeUnmount, ref } from 'vue';
 
 const props = defineProps({
@@ -60,9 +61,32 @@ onBeforeUnmount(() => {
     }
 });
 
-const submit = () => {
+const submit = async () => {
+    const result = await Swal.fire({
+        icon: 'question',
+        title: 'Perbarui berita?',
+        text: 'Perubahan berita akan disimpan.',
+        showCancelButton: true,
+        confirmButtonText: 'Ya, simpan',
+        cancelButtonText: 'Batal',
+        confirmButtonColor: '#4f46e5',
+        cancelButtonColor: '#6b7280',
+    });
+
+    if (!result.isConfirmed) {
+        return;
+    }
+
     form.post(route('berita.update', props.newsPost.id), {
         forceFormData: true,
+        onError: () => {
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal menyimpan',
+                text: 'Periksa kembali data berita yang diisi.',
+                confirmButtonColor: '#4f46e5',
+            });
+        },
     });
 };
 </script>

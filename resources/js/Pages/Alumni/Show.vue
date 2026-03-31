@@ -27,6 +27,82 @@ const photoUrl = computed(() => {
 
     return typeof payloadPhoto === 'string' && payloadPhoto.trim() !== '' ? payloadPhoto : null;
 });
+
+const studyProgram = computed(() => {
+    const organisasi = typeof props.alumni.organisasi === 'string' ? props.alumni.organisasi.trim() : '';
+
+    if (organisasi !== '') {
+        return organisasi;
+    }
+
+    const jurusan = typeof props.alumni.jurusan === 'string' ? props.alumni.jurusan.trim() : '';
+
+    return jurusan !== '' ? jurusan : null;
+});
+
+const displayValue = (value) => {
+    if (value === null || value === undefined) {
+        return '-';
+    }
+
+    if (typeof value === 'string') {
+        const cleaned = value.trim();
+
+        return cleaned !== '' ? cleaned : '-';
+    }
+
+    return String(value);
+};
+
+const displayBirthDate = computed(() => {
+    const value = props.alumni.tanggal_lahir;
+
+    if (!value) {
+        return '-';
+    }
+
+    if (typeof value === 'string') {
+        return value.split('T')[0];
+    }
+
+    return String(value);
+});
+
+const displayGender = computed(() => {
+    if (props.alumni.jenis_kelamin === 'L') {
+        return 'Laki-laki';
+    }
+
+    if (props.alumni.jenis_kelamin === 'P') {
+        return 'Perempuan';
+    }
+
+    return '-';
+});
+
+const displayEmploymentStatus = computed(() => {
+    if (props.alumni.status_bekerja === true) {
+        return 'Ya';
+    }
+
+    if (props.alumni.status_bekerja === false) {
+        return 'Tidak';
+    }
+
+    return '-';
+});
+
+const documentLink = computed(() => {
+    const value = props.alumni.link_dokumen_tambahan;
+
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    const cleaned = value.trim();
+
+    return cleaned !== '' ? cleaned : null;
+});
 </script>
 
 <template>
@@ -43,18 +119,9 @@ const photoUrl = computed(() => {
             <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
                 <div class="rounded-lg bg-white p-6 shadow-sm">
                     <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                            <h3 class="text-2xl font-semibold text-gray-900">{{ alumni.nama }}</h3>
-                            <p class="text-sm text-gray-500">NIM: {{ alumni.nim }}</p>
-                        </div>
+                        <h3 class="text-2xl font-semibold text-gray-900">Informasi Alumni</h3>
 
                         <div class="flex gap-2">
-                            <Link
-                                :href="route('alumni.edit', alumni.id)"
-                                class="rounded-md border border-indigo-200 px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50"
-                            >
-                                Edit
-                            </Link>
                             <Link
                                 :href="route('alumni.index')"
                                 class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -64,7 +131,7 @@ const photoUrl = computed(() => {
                         </div>
                     </div>
 
-                    <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start">
+                    <div class="mb-6 flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-start">
                         <img
                             v-if="photoUrl"
                             :src="photoUrl"
@@ -77,134 +144,147 @@ const photoUrl = computed(() => {
                         >
                             Tidak ada foto
                         </div>
-                        <p class="text-sm text-gray-600">
-                            Foto alumni ditampilkan dari data hasil integrasi API jika tersedia.
-                        </p>
+
+                        <div class="flex-1">
+                            <div class="grid gap-4 sm:grid-cols-2">
+                                <div>
+                                    <p class="text-xs text-gray-500">NIM</p>
+                                    <p class="text-lg font-semibold text-gray-900">{{ displayValue(alumni.nim) }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500">Nama</p>
+                                    <p class="text-lg font-semibold text-gray-900">{{ displayValue(alumni.nama) }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500">Tahun Lulus</p>
+                                    <p class="font-semibold text-slate-700">{{ displayValue(alumni.tahun_lulus) }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500">Email Kampus</p>
+                                    <p class="font-semibold text-slate-700">{{ displayValue(alumni.email_kampus) }}</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    <dl class="grid gap-5 sm:grid-cols-2">
+                    <div class="grid gap-4 sm:grid-cols-2">
                         <div>
-                            <dt class="text-sm text-gray-500">Jurusan</dt>
-                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.jurusan }}</dd>
+                            <p class="text-xs text-gray-500">Program Studi</p>
+                            <p class="font-medium text-gray-900">{{ displayValue(studyProgram) }}</p>
                         </div>
                         <div>
-                            <dt class="text-sm text-gray-500">Angkatan</dt>
-                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.angkatan }}</dd>
+                            <p class="text-xs text-gray-500">Fakultas</p>
+                            <p class="font-medium text-gray-900">{{ displayValue(alumni.fakultas) }}</p>
                         </div>
                         <div>
-                            <dt class="text-sm text-gray-500">Tahun Lulus</dt>
-                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.tahun_lulus || '-' }}</dd>
+                            <p class="text-xs text-gray-500">Email Pribadi</p>
+                            <p class="font-medium text-gray-900">{{ displayValue(alumni.email_pribadi) }}</p>
                         </div>
                         <div>
-                            <dt class="text-sm text-gray-500">No. Telepon</dt>
-                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.no_telepon || '-' }}</dd>
+                            <p class="text-xs text-gray-500">No. Telepon</p>
+                            <p class="font-medium text-gray-900">{{ displayValue(alumni.no_telepon) }}</p>
                         </div>
                         <div>
-                            <dt class="text-sm text-gray-500">Email</dt>
-                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.email || '-' }}</dd>
+                            <p class="text-xs text-gray-500">Pekerjaan</p>
+                            <p class="font-medium text-gray-900">{{ displayValue(alumni.pekerjaan) }}</p>
                         </div>
                         <div>
-                            <dt class="text-sm text-gray-500">Pekerjaan</dt>
-                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.pekerjaan || '-' }}</dd>
+                            <p class="text-xs text-gray-500">Instansi</p>
+                            <p class="font-medium text-gray-900">{{ displayValue(alumni.instansi) }}</p>
                         </div>
                         <div class="sm:col-span-2">
-                            <dt class="text-sm text-gray-500">Instansi / Perusahaan</dt>
-                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.instansi || '-' }}</dd>
+                            <p class="text-xs text-gray-500">Alamat</p>
+                            <p class="font-medium text-gray-900">{{ displayValue(alumni.alamat) }}</p>
+                        </div>
+
+                        <div class="sm:col-span-2 border-t pt-4 mt-2">
+                            <h4 class="text-sm font-semibold text-gray-800 mb-3">Data Pribadi</h4>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500">Tempat Lahir</p>
+                            <p class="font-medium text-gray-900">{{ displayValue(alumni.tempat_lahir) }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500">Tanggal Lahir</p>
+                            <p class="font-medium text-gray-900">{{ displayBirthDate }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500">Agama</p>
+                            <p class="font-medium text-gray-900">{{ displayValue(alumni.agama) }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500">Jenis Kelamin</p>
+                            <p class="font-medium text-gray-900">{{ displayGender }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500">No. KTP</p>
+                            <p class="font-medium text-gray-900">{{ displayValue(alumni.no_ktp) }}</p>
+                        </div>
+
+                        <div class="sm:col-span-2 border-t pt-4 mt-2">
+                            <h4 class="text-sm font-semibold text-gray-800 mb-3">Data Akademik</h4>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500">IPK</p>
+                            <p class="font-medium text-gray-900">{{ displayValue(alumni.ipk) }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500">Predikat</p>
+                            <p class="font-medium text-gray-900">{{ displayValue(alumni.predikat) }}</p>
                         </div>
                         <div class="sm:col-span-2">
-                            <dt class="text-sm text-gray-500">Alamat</dt>
-                            <dd class="mt-1 whitespace-pre-line text-sm font-medium text-gray-900">
-                                {{ alumni.alamat || '-' }}
-                            </dd>
+                            <p class="text-xs text-gray-500">Judul Skripsi/Tesis</p>
+                            <p class="font-medium text-gray-900">{{ displayValue(alumni.judul_skripsi) }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500">Pembimbing 1</p>
+                            <p class="font-medium text-gray-900">{{ displayValue(alumni.pembimbing_1) }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500">Pembimbing 2</p>
+                            <p class="font-medium text-gray-900">{{ displayValue(alumni.pembimbing_2) }}</p>
                         </div>
 
-                        <div v-if="alumni.tempat_lahir || alumni.tanggal_lahir" class="sm:col-span-2 border-t pt-4 mt-2">
-                            <h4 class="text-sm font-semibold text-gray-800 mb-3">Data Pribadi ( dari API)</h4>
+                        <div class="sm:col-span-2 border-t pt-4 mt-2">
+                            <h4 class="text-sm font-semibold text-gray-800 mb-3">Data Wisuda</h4>
                         </div>
-                        <div v-if="alumni.tempat_lahir">
-                            <dt class="text-sm text-gray-500">Tempat Lahir</dt>
-                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.tempat_lahir }}</dd>
+                        <div>
+                            <p class="text-xs text-gray-500">Ukuran Toga</p>
+                            <p class="font-medium text-gray-900">{{ displayValue(alumni.ukuran_toga) }}</p>
                         </div>
-                        <div v-if="alumni.tanggal_lahir">
-                            <dt class="text-sm text-gray-500">Tanggal Lahir</dt>
-                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.tanggal_lahir }}</dd>
-                        </div>
-                        <div v-if="alumni.agama">
-                            <dt class="text-sm text-gray-500">Agama</dt>
-                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.agama }}</dd>
-                        </div>
-                        <div v-if="alumni.jenis_kelamin">
-                            <dt class="text-sm text-gray-500">Jenis Kelamin</dt>
-                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan' }}</dd>
-                        </div>
-                        <div v-if="alumni.no_ktp">
-                            <dt class="text-sm text-gray-500">No. KTP</dt>
-                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.no_ktp }}</dd>
+                        <div>
+                            <p class="text-xs text-gray-500">Status Bekerja</p>
+                            <p class="font-medium text-gray-900">{{ displayEmploymentStatus }}</p>
                         </div>
 
-                        <div v-if="alumni.ipk || alumni.predikat || alumni.judul_skripsi" class="sm:col-span-2 border-t pt-4 mt-2">
-                            <h4 class="text-sm font-semibold text-gray-800 mb-3">Data Akademik ( dari API)</h4>
+                        <div class="sm:col-span-2 border-t pt-4 mt-2">
+                            <h4 class="text-sm font-semibold text-gray-800 mb-3">Data Orang Tua</h4>
                         </div>
-                        <div v-if="alumni.ipk">
-                            <dt class="text-sm text-gray-500">IPK</dt>
-                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.ipk }}</dd>
+                        <div>
+                            <p class="text-xs text-gray-500">Nama Ayah</p>
+                            <p class="font-medium text-gray-900">{{ displayValue(alumni.nama_ayah) }}</p>
                         </div>
-                        <div v-if="alumni.predikat">
-                            <dt class="text-sm text-gray-500">Predikat</dt>
-                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.predikat }}</dd>
+                        <div>
+                            <p class="text-xs text-gray-500">Nama Ibu</p>
+                            <p class="font-medium text-gray-900">{{ displayValue(alumni.nama_ibu) }}</p>
                         </div>
-                        <div v-if="alumni.judul_skripsi" class="sm:col-span-2">
-                            <dt class="text-sm text-gray-500">Judul Skripsi/Tesis</dt>
-                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.judul_skripsi }}</dd>
+                        <div>
+                            <p class="text-xs text-gray-500">No. Telepon Orang Tua</p>
+                            <p class="font-medium text-gray-900">{{ displayValue(alumni.no_telepon_orang_tua) }}</p>
                         </div>
-                        <div v-if="alumni.pembimbing_1">
-                            <dt class="text-sm text-gray-500">Pembimbing 1</dt>
-                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.pembimbing_1 }}</dd>
-                        </div>
-                        <div v-if="alumni.pembimbing_2">
-                            <dt class="text-sm text-gray-500">Pembimbing 2</dt>
-                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.pembimbing_2 }}</dd>
-                        </div>
-
-                        <div v-if="alumni.ukuran_toga || alumni.status_bekerja !== null" class="sm:col-span-2 border-t pt-4 mt-2">
-                            <h4 class="text-sm font-semibold text-gray-800 mb-3">Data Wisuda ( dari API)</h4>
-                        </div>
-                        <div v-if="alumni.ukuran_toga">
-                            <dt class="text-sm text-gray-500">Ukuran Toga</dt>
-                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.ukuran_toga }}</dd>
-                        </div>
-                        <div v-if="alumni.status_bekerja !== null">
-                            <dt class="text-sm text-gray-500">Status Bekerja</dt>
-                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.status_bekerja ? 'Ya' : 'Tidak' }}</dd>
-                        </div>
-
-                        <div v-if="alumni.nama_ayah || alumni.nama_ibu || alumni.no_telepon_orang_tua" class="sm:col-span-2 border-t pt-4 mt-2">
-                            <h4 class="text-sm font-semibold text-gray-800 mb-3">Data Orang Tua ( dari API)</h4>
-                        </div>
-                        <div v-if="alumni.nama_ayah">
-                            <dt class="text-sm text-gray-500">Nama Ayah</dt>
-                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.nama_ayah }}</dd>
-                        </div>
-                        <div v-if="alumni.nama_ibu">
-                            <dt class="text-sm text-gray-500">Nama Ibu</dt>
-                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.nama_ibu }}</dd>
-                        </div>
-                        <div v-if="alumni.no_telepon_orang_tua">
-                            <dt class="text-sm text-gray-500">No. Telepon Orang Tua</dt>
-                            <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.no_telepon_orang_tua }}</dd>
-                        </div>
-
-                        <div v-if="alumni.link_dokumen_tambahan" class="sm:col-span-2 border-t pt-4 mt-2">
-                            <h4 class="text-sm font-semibold text-gray-800 mb-3">Link Dokumen</h4>
+                        <div class="sm:col-span-2">
+                            <p class="text-xs text-gray-500">Link Dokumen Tambahan</p>
                             <a
-                                :href="alumni.link_dokumen_tambahan"
+                                v-if="documentLink"
+                                :href="documentLink"
                                 target="_blank"
-                                class="text-sm font-medium text-indigo-600 hover:text-indigo-800"
+                                class="font-medium text-indigo-600 hover:text-indigo-800"
                             >
-                                {{ alumni.link_dokumen_tambahan }}
+                                {{ documentLink }}
                             </a>
+                            <p v-else class="font-medium text-gray-900">-</p>
                         </div>
-                    </dl>
+                    </div>
                 </div>
             </div>
         </div>

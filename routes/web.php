@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminUserController;
 use App\Http\Controllers\AlumniController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\IntegrationSettingsController;
@@ -52,14 +53,16 @@ Route::get('/', function () {
         ];
 
         if ($alumniSearch !== '') {
-            $alumniResults = Alumni::query()
-                ->select(['id', 'nama', 'nim', 'angkatan'])
+            $alumniQuery = Alumni::query()
+                ->select(['id', 'nama', 'nim', 'tahun_lulus']);
+
+            $alumniResults = $alumniQuery
                 ->where(function ($query) use ($alumniSearch): void {
                     $query
                         ->where('nama', 'like', "%{$alumniSearch}%")
                         ->orWhere('nim', 'like', "%{$alumniSearch}%");
                 })
-                ->orderByDesc('angkatan')
+                ->orderByDesc('tahun_lulus')
                 ->orderBy('nama')
                 ->limit(12)
                 ->get()
@@ -68,7 +71,7 @@ Route::get('/', function () {
                     'photo' => $buildAlumniAvatar($alumni->nama),
                     'nim' => $alumni->nim,
                     'nama' => $alumni->nama,
-                    'angkatan' => $alumni->angkatan,
+                    'tahun_lulus' => $alumni->tahun_lulus,
                 ])
                 ->all();
         }
@@ -125,12 +128,14 @@ Route::get('/dashboard', function () {
             'alumniTahunIni' => $alumniTahunIni,
         ],
     ]);
-})->middleware(['auth', 'verified'])->name('dashboard');
+})->middleware(['auth', 'alumni.active', 'verified'])->name('dashboard');
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'alumni.active'])->group(function () {
     Route::prefix('admin')->middleware(['verified', 'admin'])->group(function (): void {
         Route::resource('alumni', AlumniController::class)
             ->parameters(['alumni' => 'alumni']);
+        Route::patch('alumni/{alumni}/block', [AlumniController::class, 'toggleBlock'])
+            ->name('alumni.block');
         Route::resource('berita', NewsPostController::class)
             ->names('berita')
             ->parameters(['berita' => 'newsPost'])
@@ -139,6 +144,14 @@ Route::middleware('auth')->group(function () {
             ->names('agenda')
             ->parameters(['agenda' => 'event'])
             ->where(['event' => '[0-9]+']);
+        Route::get('users', [AdminUserController::class, 'index'])
+            ->name('admin.users.index');
+        Route::get('users/create', [AdminUserController::class, 'create'])
+            ->name('admin.users.create');
+        Route::post('users', [AdminUserController::class, 'store'])
+            ->name('admin.users.store');
+        Route::delete('users/{user}', [AdminUserController::class, 'destroy'])
+            ->name('admin.users.destroy');
         Route::get('pengaturan/integrasi', [IntegrationSettingsController::class, 'index'])
             ->name('settings.integration.index');
         Route::post('pengaturan/integrasi/save', [IntegrationSettingsController::class, 'saveConfig'])

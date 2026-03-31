@@ -11,6 +11,7 @@ const showingNavigationDropdown = ref(false);
 const page = usePage();
 
 const successMessage = computed(() => page.props.flash?.success);
+const isSuperAdmin = computed(() => ['superadmin', 'admin'].includes(page.props.auth?.user?.role));
 const isAdmin = computed(() => ['superadmin', 'admin'].includes(page.props.auth?.user?.role));
 const roleLabel = computed(() => (isAdmin.value ? 'Superadmin' : 'Alumni'));
 </script>
@@ -64,6 +65,13 @@ const roleLabel = computed(() => (isAdmin.value ? 'Superadmin' : 'Alumni'));
                                     :active="route().current('agenda.*')"
                                 >
                                     Agenda
+                                </NavLink>
+                                <NavLink
+                                    v-if="isSuperAdmin"
+                                    :href="route('admin.users.index')"
+                                    :active="route().current('admin.users.*')"
+                                >
+                                    User Admin
                                 </NavLink>
                                 <NavLink
                                     v-if="isAdmin"
@@ -204,6 +212,13 @@ const roleLabel = computed(() => (isAdmin.value ? 'Superadmin' : 'Alumni'));
                             :active="route().current('agenda.*')"
                         >
                             Agenda
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            v-if="isSuperAdmin"
+                            :href="route('admin.users.index')"
+                            :active="route().current('admin.users.*')"
+                        >
+                            User Admin
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
                             v-if="isAdmin"

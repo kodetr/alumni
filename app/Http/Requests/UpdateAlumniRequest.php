@@ -30,11 +30,9 @@ class UpdateAlumniRequest extends FormRequest
         return [
             'nama' => ['required', 'string', 'max:255'],
             'nim' => ['required', 'string', 'max:30', Rule::unique('alumni', 'nim')->ignore($alumniId)],
-            'email' => ['nullable', 'email', 'max:255', Rule::unique('alumni', 'email')->ignore($alumniId)],
             'no_telepon' => ['nullable', 'string', 'max:30'],
             'jurusan' => ['required', 'string', 'max:255'],
-            'angkatan' => ['required', 'integer', 'digits:4', 'between:1900,'.$maxYear],
-            'tahun_lulus' => ['nullable', 'integer', 'digits:4', 'between:1900,'.($maxYear + 6), 'gte:angkatan'],
+            'tahun_lulus' => ['nullable', 'integer', 'digits:4', 'between:1900,'.($maxYear + 6)],
             'pekerjaan' => ['nullable', 'string', 'max:255'],
             'instansi' => ['nullable', 'string', 'max:255'],
             'alamat' => ['nullable', 'string', 'max:1000'],

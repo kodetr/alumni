@@ -224,13 +224,12 @@ const extractPreviewRows = (result) => {
             return {
                 nim,
                 nama,
-                jurisdiction,
+                jurusan: jurisdiction,
                 has_api_photo: Boolean(cleanString(item?.photo_path) || cleanString(item?.photo_3x4_path)),
                 photo_url:
                     toAbsolutePhotoUrl(item?.photo_path) ||
                     toAbsolutePhotoUrl(item?.photo_3x4_path) ||
                     previewFallbackPhoto(nama),
-                email: cleanString(item?.personal_email || item?.campus_email) || null,
                 email_kampus: cleanString(item?.campus_email) || null,
                 email_pribadi: cleanString(item?.personal_email) || null,
                 no_telepon: cleanString(item?.phone_number) || null,
@@ -261,10 +260,7 @@ const extractPreviewRows = (result) => {
                 nama_ayah: cleanString(item?.father_name) || null,
                 nama_ibu: cleanString(item?.mother_name) || null,
                 no_telepon_orang_tua: cleanString(item?.parent_phone) || null,
-                link_dokumen_tambahan: item?.extra_document_link || 
-                    item?.extra_document || 
-                    item?.document_link || 
-                    item?.additional_document_link || null,
+                link_dokumen_tambahan: item?.additional_document_link || null,
 
                 integration_payload: item,
             };
@@ -344,7 +340,7 @@ const submit = () => {
 };
 
 const savePreviewToAlumni = async () => {
-    if (!visiblePreviewRows.value.length) {
+    if (!hasPreviewRows.value) {
         fireErrorAlert('Data preview kosong', 'Ambil data API terlebih dahulu sebelum menyimpan ke tabel alumni.');
 
         return;
@@ -353,7 +349,7 @@ const savePreviewToAlumni = async () => {
     const confirmation = await Swal.fire({
         icon: 'question',
         title: 'Simpan ke tabel alumni?',
-        text: `${visiblePreviewRows.value.length} data preview akan disimpan ke data alumni.`,
+        text: `${alumniPreviewForm.records.length} data preview akan disimpan ke data alumni.`,
         showCancelButton: true,
         confirmButtonText: 'Ya, simpan',
         cancelButtonText: 'Batal',
@@ -368,40 +364,37 @@ const savePreviewToAlumni = async () => {
     activeAction.value = 'store-alumni';
 
     alumniPreviewForm.transform(() => ({
-        records: visiblePreviewRows.value.map((item) => ({
-                nim: item.nim,
-                nama: item.nama,
-              jurisdiction: item.jurusan,
-                email: item.email,
-                email_kampus: item.email_kampus,
-                email_pribadi: item.email_pribadi,
-                photo_url: item.has_api_photo ? item.photo_url : null,
-                no_telepon: item.no_telepon,
-                tahun_lulus: item.tahun_lulus,
-                pekerjaan: item.pekerjaan,
-                organisasi: item.organisasi,
-                fakultas: item.fakultas,
-                instansi: item.instansi,
-                alamat: item.alamat,
-
-                tempat_lahir: item.tempat_lahir,
-                tanggal_lahir: item.tanggal_lahir,
-                agama: item.agama,
-                jenis_kelamin: item.jenis_kelamin,
-                no_ktp: item.no_ktp,
-                ipk: item.ipk,
-                predikat: item.predikat,
-                judul_skripsi: item.judul_skripsi,
-                pembimbing_1: item.pembimbing_1,
-                pembimbing_2: item.pembimbing_2,
-                ukuran_toga: item.ukuran_toga,
-                status_bekerja: item.status_bekerja,
-                nama_ayah: item.nama_ayah,
-                nama_ibu: item.nama_ibu,
-                no_telepon_orang_tua: item.no_telepon_orang_tua,
-                link_dokumen_tambahan: item.link_dokumen_tambahan,
-
-                integration_payload: item.integration_payload,
+        records: alumniPreviewForm.records.map((item) => ({
+            nim: item.nim,
+            nama: item.nama,
+            jurusan: item.jurusan,
+            email_kampus: item.email_kampus,
+            email_pribadi: item.email_pribadi,
+            photo_url: item.has_api_photo ? item.photo_url : null,
+            no_telepon: item.no_telepon,
+            tahun_lulus: item.tahun_lulus,
+            pekerjaan: item.pekerjaan,
+            organisasi: item.organisasi,
+            fakultas: item.fakultas,
+            instansi: item.instansi,
+            alamat: item.alamat,
+            tempat_lahir: item.tempat_lahir,
+            tanggal_lahir: item.tanggal_lahir,
+            agama: item.agama,
+            jenis_kelamin: item.jenis_kelamin,
+            no_ktp: item.no_ktp,
+            ipk: item.ipk,
+            predikat: item.predikat,
+            judul_skripsi: item.judul_skripsi,
+            pembimbing_1: item.pembimbing_1,
+            pembimbing_2: item.pembimbing_2,
+            ukuran_toga: item.ukuran_toga,
+            status_bekerja: item.status_bekerja,
+            nama_ayah: item.nama_ayah,
+            nama_ibu: item.nama_ibu,
+            no_telepon_orang_tua: item.no_telepon_orang_tua,
+            link_dokumen_tambahan: item.link_dokumen_tambahan,
+            integration_payload: item.integration_payload,
         })),
     }))
         .post(route('settings.integration.store-alumni'), {
@@ -765,7 +758,7 @@ onBeforeUnmount(() => {
                         <button
                             type="button"
                             class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
-                            :disabled="!visiblePreviewRows.length || alumniPreviewForm.processing"
+                            :disabled="!hasPreviewRows || alumniPreviewForm.processing"
                             @click="savePreviewToAlumni"
                         >
                             {{ activeAction === 'store-alumni' ? 'Menyimpan data...' : 'Simpan ke Data Alumni' }}
@@ -822,7 +815,6 @@ onBeforeUnmount(() => {
                                     <th class="px-4 py-3 text-left font-semibold text-gray-700">NIM</th>
                                     <th class="px-4 py-3 text-left font-semibold text-gray-700">Nama</th>
                                     <th class="px-4 py-3 text-left font-semibold text-gray-700">Program Studi</th>
-                                    <th class="px-4 py-3 text-left font-semibold text-gray-700">Fakultas</th>
                                     <th class="px-4 py-3 text-left font-semibold text-gray-700">Tahun Lulus</th>
                                     <th class="px-4 py-3 text-center font-semibold text-gray-700">Aksi</th>
                                 </tr>
@@ -843,7 +835,6 @@ onBeforeUnmount(() => {
                                     <td class="px-4 py-3 font-medium text-gray-800">{{ item.nim }}</td>
                                     <td class="px-4 py-3 text-gray-700">{{ item.nama }}</td>
                                     <td class="px-4 py-3 text-gray-600">{{ item.organisasi || '-' }}</td>
-                                    <td class="px-4 py-3 text-gray-600">{{ item.fakultas || '-' }}</td>
                                     <td class="px-4 py-3 text-sm font-semibold text-slate-700">{{ item.tahun_lulus || '-' }}</td>
                                     <td class="px-4 py-3 text-center">
                                         <button

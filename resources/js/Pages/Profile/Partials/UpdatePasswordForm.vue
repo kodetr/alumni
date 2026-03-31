@@ -4,6 +4,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { useForm } from '@inertiajs/vue3';
+import Swal from 'sweetalert2';
 import { ref } from 'vue';
 
 const passwordInput = ref(null);
@@ -16,9 +17,31 @@ const form = useForm({
 });
 
 const updatePassword = () => {
-    form.put(route('password.update'), {
+    Swal.fire({
+        icon: 'question',
+        title: 'Ubah password?',
+        text: 'Password akun akan diperbarui.',
+        showCancelButton: true,
+        confirmButtonText: 'Ya, ubah',
+        cancelButtonText: 'Batal',
+        confirmButtonColor: '#4f46e5',
+        cancelButtonColor: '#6b7280',
+    }).then((result) => {
+        if (!result.isConfirmed) {
+            return;
+        }
+
+        form.put(route('password.update'), {
         preserveScroll: true,
-        onSuccess: () => form.reset(),
+        onSuccess: () => {
+            form.reset();
+            Swal.fire({
+                icon: 'success',
+                title: 'Berhasil',
+                text: 'Password berhasil diperbarui.',
+                confirmButtonColor: '#4f46e5',
+            });
+        },
         onError: () => {
             if (form.errors.password) {
                 form.reset('password', 'password_confirmation');
@@ -28,7 +51,15 @@ const updatePassword = () => {
                 form.reset('current_password');
                 currentPasswordInput.value.focus();
             }
+
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal memperbarui password',
+                text: 'Periksa kembali password yang diisi.',
+                confirmButtonColor: '#4f46e5',
+            });
         },
+    });
     });
 };
 </script>

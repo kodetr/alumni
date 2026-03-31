@@ -9,10 +9,8 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 const form = useForm({
     nama: '',
     nim: '',
-    email: '',
     no_telepon: '',
     jurusan: '',
-    angkatan: '',
     tahun_lulus: '',
     pekerjaan: '',
     instansi: '',
@@ -51,12 +49,6 @@ const submit = () => {
                         </div>
 
                         <div>
-                            <InputLabel for="email" value="Email" />
-                            <TextInput id="email" type="email" class="mt-1 block w-full" v-model="form.email" />
-                            <InputError class="mt-2" :message="form.errors.email" />
-                        </div>
-
-                        <div>
                             <InputLabel for="no_telepon" value="No. Telepon" />
                             <TextInput id="no_telepon" type="text" class="mt-1 block w-full" v-model="form.no_telepon" />
                             <InputError class="mt-2" :message="form.errors.no_telepon" />
@@ -66,12 +58,6 @@ const submit = () => {
                             <InputLabel for="jurusan" value="Jurusan" />
                             <TextInput id="jurusan" type="text" class="mt-1 block w-full" v-model="form.jurusan" required />
                             <InputError class="mt-2" :message="form.errors.jurusan" />
-                        </div>
-
-                        <div>
-                            <InputLabel for="angkatan" value="Angkatan" />
-                            <TextInput id="angkatan" type="number" class="mt-1 block w-full" v-model="form.angkatan" required />
-                            <InputError class="mt-2" :message="form.errors.angkatan" />
                         </div>
 
                         <div>

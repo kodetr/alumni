@@ -7,6 +7,7 @@ use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -36,6 +37,18 @@ class AlumniLoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
+        if (! Schema::hasColumn('users', 'nim') || ! Schema::hasColumn('users', 'tanggal_lahir')) {
+            throw ValidationException::withMessages([
+                'nim' => 'Login alumni belum tersedia. Hubungi admin untuk sinkronisasi struktur database.',
+            ]);
+        }
+
+        if (! Schema::hasColumn('users', 'is_blocked')) {
+            throw ValidationException::withMessages([
+                'nim' => 'Fitur login alumni belum aktif. Jalankan migrasi terbaru terlebih dahulu.',
+            ]);
+        }
+
         $tanggalLahir = $this->date('tanggal_lahir')?->format('Y-m-d');
 
         $user = User::query()
@@ -49,6 +62,12 @@ class AlumniLoginRequest extends FormRequest
 
             throw ValidationException::withMessages([
                 'nim' => 'NIM atau tanggal lahir tidak valid.',
+            ]);
+        }
+
+        if ($user->is_blocked) {
+            throw ValidationException::withMessages([
+                'nim' => 'Akun alumni Anda sedang diblokir oleh admin.',
             ]);
         }
 

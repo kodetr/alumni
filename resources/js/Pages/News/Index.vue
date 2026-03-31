@@ -1,6 +1,7 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
+import Swal from 'sweetalert2';
 import { reactive } from 'vue';
 
 const props = defineProps({
@@ -35,10 +36,23 @@ const resetFilters = () => {
     submitFilters();
 };
 
-const destroy = (id, title) => {
-    if (confirm(`Hapus berita "${title}"?`)) {
-        router.delete(route('berita.destroy', id));
+const destroy = async (id, title) => {
+    const result = await Swal.fire({
+        icon: 'warning',
+        title: 'Hapus berita?',
+        text: `Berita "${title}" akan dihapus permanen.`,
+        showCancelButton: true,
+        confirmButtonText: 'Ya, hapus',
+        cancelButtonText: 'Batal',
+        confirmButtonColor: '#dc2626',
+        cancelButtonColor: '#6b7280',
+    });
+
+    if (!result.isConfirmed) {
+        return;
     }
+
+    router.delete(route('berita.destroy', id));
 };
 
 const formatDateTime = (value) => {

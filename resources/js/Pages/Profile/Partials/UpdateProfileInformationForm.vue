@@ -4,6 +4,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Link, useForm, usePage } from '@inertiajs/vue3';
+import Swal from 'sweetalert2';
 
 defineProps({
     mustVerifyEmail: {
@@ -20,6 +21,43 @@ const form = useForm({
     name: user.name,
     email: user.email,
 });
+
+const updateProfile = async () => {
+    const result = await Swal.fire({
+        icon: 'question',
+        title: 'Simpan perubahan profil?',
+        text: 'Informasi profil akan diperbarui.',
+        showCancelButton: true,
+        confirmButtonText: 'Ya, simpan',
+        cancelButtonText: 'Batal',
+        confirmButtonColor: '#4f46e5',
+        cancelButtonColor: '#6b7280',
+    });
+
+    if (!result.isConfirmed) {
+        return;
+    }
+
+    form.patch(route('profile.update'), {
+        preserveScroll: true,
+        onSuccess: () => {
+            Swal.fire({
+                icon: 'success',
+                title: 'Berhasil',
+                text: 'Informasi profil berhasil diperbarui.',
+                confirmButtonColor: '#4f46e5',
+            });
+        },
+        onError: () => {
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal menyimpan',
+                text: 'Periksa kembali data profil yang diisi.',
+                confirmButtonColor: '#4f46e5',
+            });
+        },
+    });
+};
 </script>
 
 <template>
@@ -35,7 +73,7 @@ const form = useForm({
         </header>
 
         <form
-            @submit.prevent="form.patch(route('profile.update'))"
+            @submit.prevent="updateProfile"
             class="mt-6 space-y-6"
         >
             <div>

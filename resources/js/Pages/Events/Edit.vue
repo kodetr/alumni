@@ -7,6 +7,7 @@ import RichTextEditor from '@/Components/RichTextEditor.vue';
 import TextInput from '@/Components/TextInput.vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
+import Swal from 'sweetalert2';
 import { computed, onBeforeUnmount, ref } from 'vue';
 
 const props = defineProps({
@@ -61,9 +62,32 @@ onBeforeUnmount(() => {
     }
 });
 
-const submit = () => {
+const submit = async () => {
+    const result = await Swal.fire({
+        icon: 'question',
+        title: 'Perbarui agenda?',
+        text: 'Perubahan agenda akan disimpan.',
+        showCancelButton: true,
+        confirmButtonText: 'Ya, simpan',
+        cancelButtonText: 'Batal',
+        confirmButtonColor: '#4f46e5',
+        cancelButtonColor: '#6b7280',
+    });
+
+    if (!result.isConfirmed) {
+        return;
+    }
+
     form.post(route('agenda.update', props.event.id), {
         forceFormData: true,
+        onError: () => {
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal menyimpan',
+                text: 'Periksa kembali data agenda yang diisi.',
+                confirmButtonColor: '#4f46e5',
+            });
+        },
     });
 };
 </script>

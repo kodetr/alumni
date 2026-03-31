@@ -116,40 +116,65 @@ class IntegrationSettingsController extends Controller
     public function storeAlumniPreview(StoreAlumniPreviewRequest $request): RedirectResponse
     {
         $validated = $request->validated();
+        $records = $validated['records'] ?? Cache::get($this->previewRecordsCacheKey($request->user()?->id), []);
+
+        if (! is_array($records) || $records === []) {
+            return to_route('settings.integration.index')
+                ->withInput()
+                ->with('integrationError', 'Data preview tidak ditemukan. Klik Ambil Data API terlebih dahulu, lalu simpan lagi.');
+        }
 
         $created = 0;
         $updated = 0;
 
         try {
-            DB::transaction(function () use ($validated, &$created, &$updated): void {
-                foreach ($validated['records'] as $record) {
+            DB::transaction(function () use ($records, &$created, &$updated): void {
+                foreach ($records as $record) {
                     $nim = trim((string) $record['nim']);
+
+                    if ($nim === '') {
+                        continue;
+                    }
+
                     $existing = Alumni::query()->where('nim', $nim)->first();
 
-                    $email = $this->normalizeAlumniEmail(
-                        $record['email'] ?? null,
-                        $nim,
-                    );
+                    $jurusan = trim((string) (
+                        $record['jurusan']
+                            ?? $record['jurisdiction']
+                            ?? $record['organisasi']
+                            ?? $record['study_program_name']
+                            ?? $record['faculty_name']
+                            ?? '-'
+                    ));
+                    $instansi = $this->nullableString($record['instansi'] ?? $record['instancia'] ?? null);
+                    $statusBekerja = $record['status_bekerja'] ?? $record['is_employed'] ?? null;
+
+                    if (is_string($statusBekerja)) {
+                        $statusBekerja = in_array(strtolower($statusBekerja), ['1', 'true', 'ya', 'yes', 'bekerja'], true);
+                    }
+
+                    if ($statusBekerja !== null) {
+                        $statusBekerja = (bool) $statusBekerja;
+                    }
 
                     Alumni::query()->updateOrCreate(
                         ['nim' => $nim],
                         [
-                            'nama' => trim((string) $record['nama']),
-                            'email' => $email,
-                            'email_kampus' => $this->nullableString($record['email_kampus'] ?? null),
-                            'email_pribadi' => $this->nullableString($record['email_pribadi'] ?? null),
+                            'nama' => trim((string) ($record['nama'] ?? $record['full_name'] ?? '-')),
+                            'email_kampus' => $this->nullableString($record['email_kampus'] ?? $record['campus_email'] ?? null),
+                            'email_pribadi' => $this->nullableString($record['email_pribadi'] ?? $record['personal_email'] ?? null),
                             'photo_url' => $this->downloadAndSavePhoto(
                                 $record['photo_url'] ?? null,
                                 $record['integration_payload']['photo_3x4_path'] ?? $record['photo_3x4_path'] ?? null,
                                 $nim,
                             ),
-                            'no_telepon' => $this->nullableString($record['no_telepon'] ?? null),
-                            'jurusan' => trim((string) $record['jurusan']),
+                            'no_telepon' => $this->nullableString($record['no_telepon'] ?? $record['phone_number'] ?? null),
+                            'jurusan' => $jurusan,
                             'tahun_lulus' => isset($record['tahun_lulus']) && $record['tahun_lulus'] !== '' ? (int) $record['tahun_lulus'] : null,
                             'pekerjaan' => $this->nullableString($record['pekerjaan'] ?? null),
                             'organisasi' => $this->nullableString($record['organisasi'] ?? null),
-                            'fakultas' => $this->nullableString($record['fakultas'] ?? null),
-                            'instansi' => $this->nullableString($record['instansi'] ?? null),
+                            'fakultas' => $this->nullableString($record['fakultas'] ?? $record['faculty_name'] ?? null),
+                            'instansi' => $instansi,
                             'alamat' => $this->nullableString($record['alamat'] ?? null),
                             'integration_payload' => isset($record['integration_payload']) && is_array($record['integration_payload'])
                                 ? $this->filterIntegrationPayload($record['integration_payload'])
@@ -165,13 +190,11 @@ class IntegrationSettingsController extends Controller
                             'pembimbing_1' => $this->nullableString($record['pembimbing_1'] ?? $record['supervisor_1'] ?? null),
                             'pembimbing_2' => $this->nullableString($record['pembimbing_2'] ?? $record['supervisor_2'] ?? null),
                             'ukuran_toga' => $this->nullableString($record['ukuran_toga'] ?? $record['gown_size'] ?? null),
-                            'status_bekerja' => isset($record['status_bekerja']) || isset($record['is_employed'])
-                                ? ($record['status_bekerja'] ?? $record['is_employed'] ?? null)
-                                : null,
+                            'status_bekerja' => $statusBekerja,
                             'nama_ayah' => $this->nullableString($record['nama_ayah'] ?? $record['father_name'] ?? null),
                             'nama_ibu' => $this->nullableString($record['nama_ibu'] ?? $record['mother_name'] ?? null),
                             'no_telepon_orang_tua' => $this->nullableString($record['no_telepon_orang_tua'] ?? $record['parent_phone'] ?? null),
-                            'link_dokumen_tambahan' => $this->nullableString($record['link_dokumen_tambahan'] ?? $record['extra_document_link'] ?? null),
+                            'link_dokumen_tambahan' => $this->nullableString($record['link_dokumen_tambahan'] ?? $record['additional_document_link'] ?? null),
                         ],
                     );
 
@@ -223,6 +246,13 @@ class IntegrationSettingsController extends Controller
                 is_array($payload) ? $payload : [],
             );
             $totalRecords = $this->extractTotalRecords($aggregatedPayload);
+            $previewRecords = $this->extractPreviewRecordsFromPayload($aggregatedPayload, $validated['endpoint']);
+
+            Cache::put(
+                $this->previewRecordsCacheKey($request->user()?->id),
+                $previewRecords,
+                now()->addHours(6),
+            );
 
             $this->storeConnectionStatus(true, $response->status(), $validated['endpoint'], 'Data menu berhasil diambil dari API.');
 
@@ -438,6 +468,138 @@ class IntegrationSettingsController extends Controller
         }
 
         return 0;
+    }
+
+    private function previewRecordsCacheKey(?int $userId): string
+    {
+        return 'integration.preview.records.user.'.($userId ?? 0);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<int, array<string, mixed>>
+     */
+    private function extractPreviewRecordsFromPayload(array $payload, string $endpoint): array
+    {
+        $rows = [];
+
+        if (is_array($payload['pagination']['data'] ?? null)) {
+            $rows = $payload['pagination']['data'];
+        } elseif (is_array($payload['data'] ?? null)) {
+            $rows = $payload['data'];
+        } elseif (array_is_list($payload)) {
+            $rows = $payload;
+        }
+
+        $records = [];
+
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $nim = trim((string) ($row['nim'] ?? ''));
+            $nama = trim((string) ($row['full_name'] ?? $row['name'] ?? ''));
+
+            if ($nim === '' || $nama === '') {
+                continue;
+            }
+
+            $records[] = [
+                'nim' => $nim,
+                'nama' => $nama,
+                'jurusan' => trim((string) ($row['study_program_name'] ?? $row['faculty_name'] ?? '-')),
+                'email_kampus' => $this->nullableString($row['campus_email'] ?? null),
+                'email_pribadi' => $this->nullableString($row['personal_email'] ?? null),
+                'photo_url' => $this->resolvePhotoUrlForPreview($row, $endpoint),
+                'no_telepon' => $this->nullableString($row['phone_number'] ?? null),
+                'tahun_lulus' => $this->extractGraduationYearFromApiRow($row),
+                'pekerjaan' => isset($row['is_employed'])
+                    ? ((bool) $row['is_employed'] ? 'Bekerja' : 'Belum Bekerja')
+                    : null,
+                'organisasi' => $this->nullableString($row['study_program_name'] ?? null),
+                'fakultas' => $this->nullableString($row['faculty_name'] ?? null),
+                'instansi' => null,
+                'alamat' => $this->nullableString($row['full_address'] ?? null),
+                'tempat_lahir' => $this->nullableString($row['birth_place'] ?? null),
+                'tanggal_lahir' => $this->parseDate($row['birth_date'] ?? null),
+                'agama' => $this->nullableString($row['religion'] ?? null),
+                'jenis_kelamin' => $this->nullableString($row['gender'] ?? null),
+                'no_ktp' => $this->nullableString($row['ktp_number'] ?? null),
+                'ipk' => isset($row['ipk']) && $row['ipk'] !== '' ? (float) $row['ipk'] : null,
+                'predikat' => $this->nullableString($row['predicate'] ?? null),
+                'judul_skripsi' => $this->nullableString($row['thesis_title'] ?? null),
+                'pembimbing_1' => $this->nullableString($row['supervisor_1'] ?? null),
+                'pembimbing_2' => $this->nullableString($row['supervisor_2'] ?? null),
+                'ukuran_toga' => $this->nullableString($row['gown_size'] ?? null),
+                'status_bekerja' => $row['is_employed'] ?? null,
+                'nama_ayah' => $this->nullableString($row['father_name'] ?? null),
+                'nama_ibu' => $this->nullableString($row['mother_name'] ?? null),
+                'no_telepon_orang_tua' => $this->nullableString($row['parent_phone'] ?? null),
+                'link_dokumen_tambahan' => $this->nullableString($row['additional_document_link'] ?? null),
+                'integration_payload' => $row,
+            ];
+        }
+
+        return $records;
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    private function resolvePhotoUrlForPreview(array $row, string $endpoint): ?string
+    {
+        $photoPath = $this->nullableString($row['photo_path'] ?? $row['photo_3x4_path'] ?? null);
+
+        if (! $photoPath) {
+            return null;
+        }
+
+        if (str_starts_with($photoPath, 'http://') || str_starts_with($photoPath, 'https://')) {
+            return $photoPath;
+        }
+
+        try {
+            $origin = rtrim((string) parse_url($endpoint, PHP_URL_SCHEME).'://'.(string) parse_url($endpoint, PHP_URL_HOST).(parse_url($endpoint, PHP_URL_PORT) ? ':'.parse_url($endpoint, PHP_URL_PORT) : ''), '/');
+            $path = str_starts_with($photoPath, '/') ? $photoPath : '/'.$photoPath;
+
+            return $origin !== '' ? $origin.$path : $photoPath;
+        } catch (Throwable) {
+            return $photoPath;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    private function extractGraduationYearFromApiRow(array $row): ?int
+    {
+        $tahunLulus = $row['tahun_lulus'] ?? null;
+
+        if (is_numeric($tahunLulus)) {
+            $year = (int) $tahunLulus;
+
+            if ($year >= 1900 && $year <= 2100) {
+                return $year;
+            }
+        }
+
+        $candidates = [
+            (string) ($row['source_ceremony_name'] ?? ''),
+            (string) ($row['source_session_name'] ?? ''),
+        ];
+
+        foreach ($candidates as $text) {
+            if (preg_match('/(?:19|20)\d{2}/', $text, $matches)) {
+                $year = (int) $matches[0];
+
+                if ($year >= 1900 && $year <= 2100) {
+                    return $year;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -1002,24 +1164,6 @@ class IntegrationSettingsController extends Controller
             : 'Periksa koneksi database dan pastikan tool backup/import tersedia di server.';
     }
 
-    private function normalizeAlumniEmail(mixed $email, string $nim): ?string
-    {
-        $normalized = $this->nullableString($email);
-
-        if (! $normalized) {
-            return null;
-        }
-
-        $normalized = strtolower($normalized);
-
-        $usedByOtherNim = Alumni::query()
-            ->where('email', $normalized)
-            ->where('nim', '!=', $nim)
-            ->exists();
-
-        return $usedByOtherNim ? null : $normalized;
-    }
-
     private function nullableString(mixed $value): ?string
     {
         if (! is_string($value)) {
@@ -1150,7 +1294,7 @@ class IntegrationSettingsController extends Controller
             $saved = Storage::disk('public')->put($filename, $contents);
 
             if ($saved) {
-                return Storage::disk('public')->url($filename);
+                return Storage::url($filename);
             }
         } catch (Throwable) {
         }

@@ -35,7 +35,7 @@ defineProps({
 const layanan = [
     {
         title: 'Direktori Alumni Terpusat',
-        description: 'Data alumni tersimpan rapi berdasarkan angkatan, jurusan, dan riwayat karier.',
+        description: 'Data alumni tersimpan rapi berdasarkan jurusan, tahun lulus, dan riwayat karier.',
     },
     {
         title: 'Tracer Study Berkala',
@@ -234,8 +234,8 @@ const formatDate = (value) => {
                                     <p class="mt-1 text-sm font-semibold text-slate-900">{{ item.nim }}</p>
                                     <p class="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700">Nama</p>
                                     <p class="mt-1 text-sm font-semibold text-slate-900">{{ item.nama }}</p>
-                                    <p class="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700">Tahun Angkatan</p>
-                                    <p class="mt-1 text-sm font-semibold text-slate-900">{{ item.angkatan }}</p>
+                                    <p class="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700">Tahun Lulus</p>
+                                    <p class="mt-1 text-sm font-semibold text-slate-900">{{ item.tahun_lulus || '-' }}</p>
                                 </div>
                             </div>
                         </article>

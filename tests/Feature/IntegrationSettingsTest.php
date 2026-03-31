@@ -251,8 +251,6 @@ class IntegrationSettingsTest extends TestCase
                         'nim' => '2300000001',
                         'nama' => 'Wisudawan 1',
                         'jurusan' => 'Teknik Industri',
-                        'angkatan' => 2023,
-                        'email' => 'wisudawan1@example.com',
                         'photo_url' => 'https://cdn.example.com/photos/2300000001.jpg',
                         'no_telepon' => '08123456789',
                         'tahun_lulus' => 2026,
@@ -262,14 +260,13 @@ class IntegrationSettingsTest extends TestCase
                         'integration_payload' => [
                             'full_name' => 'Wisudawan 1',
                             'photo_path' => '/storage/photos/2300000001.jpg',
+                            'intake_year' => 2023,
                         ],
                     ],
                     [
                         'nim' => '2300000002',
                         'nama' => 'Wisudawan 2',
                         'jurusan' => 'Administrasi Publik',
-                        'angkatan' => 2022,
-                        'email' => null,
                         'no_telepon' => null,
                         'tahun_lulus' => 2026,
                         'pekerjaan' => null,
@@ -277,6 +274,7 @@ class IntegrationSettingsTest extends TestCase
                         'alamat' => null,
                         'integration_payload' => [
                             'full_name' => 'Wisudawan 2',
+                            'intake_year' => 2023,
                         ],
                     ],
                 ],
@@ -290,9 +288,13 @@ class IntegrationSettingsTest extends TestCase
             'nim' => '2300000001',
             'nama' => 'Wisudawan 1',
             'jurusan' => 'Teknik Industri',
-            'angkatan' => 2023,
             'tahun_lulus' => 2026,
             'photo_url' => 'https://cdn.example.com/photos/2300000001.jpg',
+        ]);
+
+        $this->assertDatabaseHas('alumni', [
+            'nim' => '2300000002',
+            'tahun_lulus' => 2026,
         ]);
 
         $this->assertDatabaseCount('alumni', 2);
