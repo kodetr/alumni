@@ -1,10 +1,9 @@
 <script setup>
-import GuestLayout from '@/Layouts/GuestLayout.vue';
+import ApplicationLogo from '@/Components/ApplicationLogo.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm } from '@inertiajs/vue3';
 
 const props = defineProps({
     email: {
@@ -32,70 +31,124 @@ const submit = () => {
 </script>
 
 <template>
-    <GuestLayout>
-        <Head title="Reset Password" />
+    <Head title="Reset Password" />
 
-        <form @submit.prevent="submit">
-            <div>
-                <InputLabel for="email" value="Email" />
+    <div class="relative min-h-screen overflow-hidden bg-slate-950">
+        <div class="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-cyan-400/20 blur-3xl" />
+        <div class="absolute -right-24 top-1/3 h-80 w-80 rounded-full bg-indigo-500/20 blur-3xl" />
 
-                <TextInput
-                    id="email"
-                    type="email"
-                    class="mt-1 block w-full"
-                    v-model="form.email"
-                    required
-                    autofocus
-                    autocomplete="username"
-                />
+        <div class="relative mx-auto flex min-h-screen max-w-6xl items-center px-4 py-8 sm:px-6 lg:px-8">
+            <div class="grid w-full overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-2xl lg:grid-cols-5">
+                <aside class="hidden bg-gradient-to-b from-slate-900 to-slate-800 p-10 text-white lg:col-span-2 lg:flex lg:flex-col lg:justify-between">
+                    <Link href="/" class="inline-flex items-center gap-3">
+                        <ApplicationLogo class="h-10 w-10 fill-current text-cyan-300" />
+                        <div>
+                            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-200">Portal</p>
+                            <p class="text-base font-semibold">Alumni Kampus</p>
+                        </div>
+                    </Link>
 
-                <InputError class="mt-2" :message="form.errors.email" />
+                    <div class="space-y-5">
+                        <p class="text-sm font-medium uppercase tracking-[0.18em] text-cyan-200">Keamanan Akun</p>
+                        <h2 class="text-3xl font-semibold leading-tight">Atur password baru dengan aman.</h2>
+                        <p class="text-sm leading-6 text-slate-300">
+                            Buat password yang kuat untuk melindungi akses dashboard superadmin dan data alumni.
+                        </p>
+                    </div>
+
+                    <div class="rounded-2xl border border-white/20 bg-white/5 p-4">
+                        <svg class="h-28 w-full" viewBox="0 0 240 160" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Ilustrasi kampus">
+                            <path d="M26 68L120 30L214 68L120 106L26 68Z" fill="#67E8F9" fill-opacity="0.3" />
+                            <rect x="40" y="78" width="160" height="56" rx="8" fill="#0F172A" stroke="#7DD3FC" stroke-opacity="0.6" />
+                            <path d="M120 93C128.284 93 135 86.2843 135 78C135 69.7157 128.284 63 120 63C111.716 63 105 69.7157 105 78C105 86.2843 111.716 93 120 93Z" fill="#CFFAFE" />
+                            <rect x="113" y="92" width="14" height="28" rx="7" fill="#CFFAFE" />
+                        </svg>
+                        <p class="mt-3 text-sm text-slate-200">Brand kampus tetap konsisten di setiap alur autentikasi superadmin.</p>
+                    </div>
+                </aside>
+
+                <section class="col-span-3 p-6 sm:p-10">
+                    <div class="flex items-center justify-between gap-4">
+                        <Link href="/admin/login" class="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900">
+                            <span aria-hidden="true">&larr;</span>
+                            Kembali ke login
+                        </Link>
+                        <div class="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            Superadmin
+                        </div>
+                    </div>
+
+                    <div class="mt-8 lg:hidden">
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <div class="inline-flex items-center gap-2">
+                                <ApplicationLogo class="h-8 w-8 fill-current text-slate-700" />
+                                <p class="text-sm font-semibold text-slate-700">Portal Alumni Kampus</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-8">
+                        <p class="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Reset Password</p>
+                        <h1 class="mt-2 text-3xl font-bold text-slate-900">Buat password superadmin baru</h1>
+                        <p class="mt-3 text-sm leading-6 text-slate-600">
+                            Pastikan password baru unik, panjang, dan tidak sama dengan password sebelumnya.
+                        </p>
+                    </div>
+
+                    <form class="mt-8 space-y-5" @submit.prevent="submit">
+                        <div>
+                            <InputLabel for="email" value="Email Superadmin" />
+                            <TextInput
+                                id="email"
+                                type="email"
+                                class="mt-2 block w-full rounded-xl border-slate-300 px-3 py-2.5"
+                                v-model="form.email"
+                                required
+                                autofocus
+                                autocomplete="username"
+                                placeholder="nama@kampus.ac.id"
+                            />
+                            <InputError class="mt-2" :message="form.errors.email" />
+                        </div>
+
+                        <div>
+                            <InputLabel for="password" value="Password Baru" />
+                            <TextInput
+                                id="password"
+                                type="password"
+                                class="mt-2 block w-full rounded-xl border-slate-300 px-3 py-2.5"
+                                v-model="form.password"
+                                required
+                                autocomplete="new-password"
+                                placeholder="Masukkan password baru"
+                            />
+                            <InputError class="mt-2" :message="form.errors.password" />
+                        </div>
+
+                        <div>
+                            <InputLabel for="password_confirmation" value="Konfirmasi Password Baru" />
+                            <TextInput
+                                id="password_confirmation"
+                                type="password"
+                                class="mt-2 block w-full rounded-xl border-slate-300 px-3 py-2.5"
+                                v-model="form.password_confirmation"
+                                required
+                                autocomplete="new-password"
+                                placeholder="Ulangi password baru"
+                            />
+                            <InputError class="mt-2" :message="form.errors.password_confirmation" />
+                        </div>
+
+                        <button
+                            type="submit"
+                            class="inline-flex w-full items-center justify-center rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                            :disabled="form.processing"
+                        >
+                            Simpan Password Baru
+                        </button>
+                    </form>
+                </section>
             </div>
-
-            <div class="mt-4">
-                <InputLabel for="password" value="Password" />
-
-                <TextInput
-                    id="password"
-                    type="password"
-                    class="mt-1 block w-full"
-                    v-model="form.password"
-                    required
-                    autocomplete="new-password"
-                />
-
-                <InputError class="mt-2" :message="form.errors.password" />
-            </div>
-
-            <div class="mt-4">
-                <InputLabel
-                    for="password_confirmation"
-                    value="Confirm Password"
-                />
-
-                <TextInput
-                    id="password_confirmation"
-                    type="password"
-                    class="mt-1 block w-full"
-                    v-model="form.password_confirmation"
-                    required
-                    autocomplete="new-password"
-                />
-
-                <InputError
-                    class="mt-2"
-                    :message="form.errors.password_confirmation"
-                />
-            </div>
-
-            <div class="mt-4 flex items-center justify-end">
-                <PrimaryButton
-                    :class="{ 'opacity-25': form.processing }"
-                    :disabled="form.processing"
-                >
-                    Reset Password
-                </PrimaryButton>
-            </div>
-        </form>
-    </GuestLayout>
+        </div>
+    </div>
 </template>

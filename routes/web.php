@@ -12,13 +12,36 @@ use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 Route::get('/', function () {
+    $alumniSearch = request()->string('q')->trim()->toString();
+
     $stats = [
         'totalAlumni' => 0,
         'jumlahJurusan' => 0,
         'lulusanTahunIni' => 0,
     ];
+    $alumniResults = [];
     $newsPosts = [];
     $events = [];
+
+    $buildAlumniAvatar = static function (string $name): string {
+        $parts = preg_split('/\s+/', trim($name)) ?: [];
+        $initials = '';
+
+        foreach (array_slice($parts, 0, 2) as $part) {
+            if ($part !== '') {
+                $initials .= strtoupper(substr($part, 0, 1));
+            }
+        }
+
+        if ($initials === '') {
+            $initials = 'AL';
+        }
+
+        $safeInitials = htmlspecialchars($initials, ENT_QUOTES, 'UTF-8');
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#0f172a"/><stop offset="100%" stop-color="#0369a1"/></linearGradient></defs><rect width="160" height="160" rx="22" fill="url(#g)"/><text x="80" y="93" text-anchor="middle" font-size="52" font-family="Arial, sans-serif" font-weight="700" fill="#e0f2fe">'.$safeInitials.'</text></svg>';
+
+        return 'data:image/svg+xml;base64,'.base64_encode($svg);
+    };
 
     if (Schema::hasTable('alumni')) {
         $stats = [
@@ -26,6 +49,28 @@ Route::get('/', function () {
             'jumlahJurusan' => Alumni::query()->distinct('jurusan')->count('jurusan'),
             'lulusanTahunIni' => Alumni::where('tahun_lulus', now()->year)->count(),
         ];
+
+        if ($alumniSearch !== '') {
+            $alumniResults = Alumni::query()
+                ->select(['id', 'nama', 'nim', 'angkatan'])
+                ->where(function ($query) use ($alumniSearch): void {
+                    $query
+                        ->where('nama', 'like', "%{$alumniSearch}%")
+                        ->orWhere('nim', 'like', "%{$alumniSearch}%");
+                })
+                ->orderByDesc('angkatan')
+                ->orderBy('nama')
+                ->limit(12)
+                ->get()
+                ->map(fn (Alumni $alumni) => [
+                    'id' => $alumni->id,
+                    'photo' => $buildAlumniAvatar($alumni->nama),
+                    'nim' => $alumni->nim,
+                    'nama' => $alumni->nama,
+                    'angkatan' => $alumni->angkatan,
+                ])
+                ->all();
+        }
     }
 
     if (Schema::hasTable('news_posts')) {
@@ -50,8 +95,9 @@ Route::get('/', function () {
 
     return Inertia::render('Welcome', [
         'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
         'stats' => $stats,
+        'alumniSearch' => $alumniSearch,
+        'alumniResults' => $alumniResults,
         'newsPosts' => $newsPosts,
         'events' => $events,
     ]);

@@ -6,10 +6,6 @@ defineProps({
         type: Boolean,
         default: true,
     },
-    canRegister: {
-        type: Boolean,
-        default: false,
-    },
     stats: {
         type: Object,
         default: () => ({
@@ -17,6 +13,14 @@ defineProps({
             jumlahJurusan: 0,
             lulusanTahunIni: 0,
         }),
+    },
+    alumniSearch: {
+        type: String,
+        default: '',
+    },
+    alumniResults: {
+        type: Array,
+        default: () => [],
     },
     newsPosts: {
         type: Array,
@@ -48,7 +52,7 @@ const layanan = [
 ];
 
 const alur = [
-    'Alumni melakukan registrasi atau login ke portal resmi.',
+    'Alumni mencari data atau login ke portal resmi sesuai hak akses.',
     'Data profil, akademik, dan pekerjaan diperbarui secara mandiri.',
     'Admin memvalidasi, mengelola, dan menyajikan laporan alumni.',
 ];
@@ -97,13 +101,12 @@ const formatDate = (value) => {
                                 Masuk
                             </Link>
 
-                            <Link
-                                v-if="canRegister"
-                                :href="route('register')"
+                            <a
+                                href="#cari-alumni"
                                 class="rounded-full bg-cyan-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-cyan-600"
                             >
-                                Daftar
-                            </Link>
+                                Cari Alumni
+                            </a>
                         </template>
                     </nav>
                 </div>
@@ -139,6 +142,12 @@ const formatDate = (value) => {
                                 Mulai Akses Portal
                             </Link>
                             <a
+                                href="#cari-alumni"
+                                class="rounded-full border border-cyan-700 px-6 py-3 text-sm font-semibold text-cyan-700 transition hover:bg-cyan-50"
+                            >
+                                Cari Alumni
+                            </a>
+                            <a
                                 href="#layanan"
                                 class="rounded-full border border-slate-300 px-6 py-3 text-sm font-semibold text-slate-700 transition hover:border-cyan-700 hover:text-cyan-700"
                             >
@@ -172,6 +181,75 @@ const formatDate = (value) => {
                 </div>
             </section>
         </div>
+
+        <section id="cari-alumni" class="mx-auto w-full max-w-7xl px-6 py-16 lg:px-8 lg:py-20">
+            <div class="rise-in rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                        <p class="text-sm font-semibold uppercase tracking-[0.16em] text-cyan-700">Pencarian Alumni</p>
+                        <h2 class="font-display mt-2 text-3xl text-slate-900">Cari data alumni</h2>
+                        <p class="mt-2 text-sm text-slate-600">Masukkan NIM atau nama untuk menemukan data alumni.</p>
+                    </div>
+                </div>
+
+                <form class="mt-6 flex flex-col gap-3 sm:flex-row" method="get" action="/">
+                    <input
+                        type="text"
+                        name="q"
+                        :value="alumniSearch"
+                        placeholder="Contoh: 20260001 atau Alumni Demo"
+                        class="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-cyan-600 focus:ring-2 focus:ring-cyan-100"
+                    />
+                    <button
+                        type="submit"
+                        class="inline-flex shrink-0 items-center justify-center rounded-xl bg-cyan-700 px-6 py-3 text-sm font-semibold text-white transition hover:bg-cyan-600"
+                    >
+                        Cari Alumni
+                    </button>
+                </form>
+
+                <div class="mt-8">
+                    <p v-if="alumniSearch" class="text-sm font-medium text-slate-600">
+                        Hasil pencarian untuk: <span class="font-semibold text-slate-900">{{ alumniSearch }}</span>
+                    </p>
+                    <p v-else class="text-sm text-slate-500">
+                        Masukkan kata kunci untuk menampilkan hasil pencarian alumni.
+                    </p>
+
+                    <div v-if="alumniResults.length" class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        <article
+                            v-for="item in alumniResults"
+                            :key="item.id"
+                            class="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                        >
+                            <div class="flex items-start gap-4">
+                                <img
+                                    :src="item.photo"
+                                    alt="Foto alumni"
+                                    class="h-[120px] w-[80px] shrink-0 rounded-xl border border-slate-200 object-cover"
+                                />
+
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700">NIM</p>
+                                    <p class="mt-1 text-sm font-semibold text-slate-900">{{ item.nim }}</p>
+                                    <p class="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700">Nama</p>
+                                    <p class="mt-1 text-sm font-semibold text-slate-900">{{ item.nama }}</p>
+                                    <p class="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700">Tahun Angkatan</p>
+                                    <p class="mt-1 text-sm font-semibold text-slate-900">{{ item.angkatan }}</p>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+
+                    <p
+                        v-else-if="alumniSearch"
+                        class="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500"
+                    >
+                        Data alumni tidak ditemukan.
+                    </p>
+                </div>
+            </div>
+        </section>
 
         <section id="layanan" class="mx-auto w-full max-w-7xl px-6 py-16 lg:px-8 lg:py-20">
             <div class="rise-in text-center">
@@ -341,13 +419,12 @@ const formatDate = (value) => {
                     >
                         Masuk ke Portal
                     </Link>
-                    <Link
-                        v-if="canRegister"
-                        :href="route('register')"
+                    <a
+                        href="#cari-alumni"
                         class="rounded-full border border-white/60 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
                     >
-                        Registrasi Akun
-                    </Link>
+                        Cari Alumni
+                    </a>
                 </div>
             </div>
         </section>
