@@ -193,6 +193,17 @@ const photoUrl = computed(() => {
                             <dt class="text-sm text-gray-500">No. Telepon Orang Tua</dt>
                             <dd class="mt-1 text-sm font-medium text-gray-900">{{ alumni.no_telepon_orang_tua }}</dd>
                         </div>
+
+                        <div v-if="alumni.link_dokumen_tambahan" class="sm:col-span-2 border-t pt-4 mt-2">
+                            <h4 class="text-sm font-semibold text-gray-800 mb-3">Link Dokumen</h4>
+                            <a
+                                :href="alumni.link_dokumen_tambahan"
+                                target="_blank"
+                                class="text-sm font-medium text-indigo-600 hover:text-indigo-800"
+                            >
+                                {{ alumni.link_dokumen_tambahan }}
+                            </a>
+                        </div>
                     </dl>
                 </div>
             </div>

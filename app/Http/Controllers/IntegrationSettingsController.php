@@ -136,10 +136,15 @@ class IntegrationSettingsController extends Controller
                         [
                             'nama' => trim((string) $record['nama']),
                             'email' => $email,
-                            'photo_url' => $this->nullableString($record['photo_url'] ?? null),
+                            'email_kampus' => $this->nullableString($record['email_kampus'] ?? null),
+                            'email_pribadi' => $this->nullableString($record['email_pribadi'] ?? null),
+                            'photo_url' => $this->downloadAndSavePhoto(
+                                $record['photo_url'] ?? null,
+                                $record['integration_payload']['photo_3x4_path'] ?? $record['photo_3x4_path'] ?? null,
+                                $nim,
+                            ),
                             'no_telepon' => $this->nullableString($record['no_telepon'] ?? null),
                             'jurusan' => trim((string) $record['jurusan']),
-                            'angkatan' => (int) $record['angkatan'],
                             'tahun_lulus' => isset($record['tahun_lulus']) && $record['tahun_lulus'] !== '' ? (int) $record['tahun_lulus'] : null,
                             'pekerjaan' => $this->nullableString($record['pekerjaan'] ?? null),
                             'organisasi' => $this->nullableString($record['organisasi'] ?? null),
@@ -166,6 +171,7 @@ class IntegrationSettingsController extends Controller
                             'nama_ayah' => $this->nullableString($record['nama_ayah'] ?? $record['father_name'] ?? null),
                             'nama_ibu' => $this->nullableString($record['nama_ibu'] ?? $record['mother_name'] ?? null),
                             'no_telepon_orang_tua' => $this->nullableString($record['no_telepon_orang_tua'] ?? $record['parent_phone'] ?? null),
+                            'link_dokumen_tambahan' => $this->nullableString($record['link_dokumen_tambahan'] ?? $record['extra_document_link'] ?? null),
                         ],
                     );
 
@@ -1068,7 +1074,7 @@ class IntegrationSettingsController extends Controller
             'verified_by',
         ];
 
-        $excludePatterns = ['_id', 'Nama Sesi', 'Nama Acara', 'ID User', 'Diperbarui', 'Diarsipkan', 'Diverifikasi'];
+        $excludePatterns = ['_id', 'Nama Sesi', 'Nama Acara', 'ID User', 'Diperbarui', 'Diarsipkan', 'Diverifikasi', 'Dokumen'];
 
         $filtered = [];
 
@@ -1109,5 +1115,46 @@ class IntegrationSettingsController extends Controller
         }
 
         return number_format($bytes / (1024 * 1024), 2).' MB';
+    }
+
+    private function downloadAndSavePhoto(?string $directUrl, ?string $apiPhotoPath, string $nim): ?string
+    {
+        $urlToDownload = null;
+
+        if ($directUrl && filter_var($directUrl, FILTER_VALIDATE_URL)) {
+            $urlToDownload = $directUrl;
+        } elseif ($apiPhotoPath && filter_var($apiPhotoPath, FILTER_VALIDATE_URL)) {
+            $urlToDownload = $apiPhotoPath;
+        }
+
+        if (! $urlToDownload) {
+            return $this->nullableString($directUrl);
+        }
+
+        try {
+            $contents = Http::timeout(30)->get($urlToDownload)->body();
+
+            if (empty($contents)) {
+                return $this->nullableString($directUrl);
+            }
+
+            $extension = 'jpg';
+            if (preg_match('/\.(\w+)/', $urlToDownload, $matches)) {
+                $ext = strtolower($matches[1]);
+                if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
+                    $extension = $ext;
+                }
+            }
+
+            $filename = 'alumni/'.$nim.'_'.time().'.'.$extension;
+            $saved = Storage::disk('public')->put($filename, $contents);
+
+            if ($saved) {
+                return Storage::disk('public')->url($filename);
+            }
+        } catch (Throwable) {
+        }
+
+        return $this->nullableString($directUrl);
     }
 }

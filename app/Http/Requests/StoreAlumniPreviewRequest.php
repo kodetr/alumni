@@ -27,7 +27,6 @@ class StoreAlumniPreviewRequest extends FormRequest
             'records.*.nim' => ['required', 'string', 'max:30'],
             'records.*.nama' => ['required', 'string', 'max:255'],
             'records.*.jurusan' => ['required', 'string', 'max:255'],
-            'records.*.angkatan' => ['required', 'integer', 'between:1900,2100'],
             'records.*.email' => ['nullable', 'email', 'max:255'],
             'records.*.photo_url' => ['nullable', 'string', 'max:2048'],
             'records.*.no_telepon' => ['nullable', 'string', 'max:30'],
@@ -50,7 +49,6 @@ class StoreAlumniPreviewRequest extends FormRequest
             'records.*.nim.required' => 'NIM wajib diisi.',
             'records.*.nama.required' => 'Nama wajib diisi.',
             'records.*.jurusan.required' => 'Jurusan wajib diisi.',
-            'records.*.angkatan.required' => 'Angkatan wajib diisi untuk setiap alumni.',
         ];
     }
 }

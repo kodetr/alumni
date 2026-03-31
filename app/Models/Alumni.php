@@ -15,10 +15,11 @@ class Alumni extends Model
         'nama',
         'nim',
         'email',
+        'email_kampus',
+        'email_pribadi',
         'photo_url',
         'no_telepon',
         'jurusan',
-        'angkatan',
         'tahun_lulus',
         'pekerjaan',
         'organisasi',
@@ -41,13 +42,13 @@ class Alumni extends Model
         'nama_ayah',
         'nama_ibu',
         'no_telepon_orang_tua',
+        'link_dokumen_tambahan',
     ];
 
     /**
      * @var array<string, string>
      */
     protected $casts = [
-        'angkatan' => 'integer',
         'tahun_lulus' => 'integer',
         'integration_payload' => 'array',
         'tanggal_lahir' => 'date',

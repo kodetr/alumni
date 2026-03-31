@@ -9,8 +9,14 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('alumni', function (Blueprint $table) {
+            $table->dropColumn('angkatan');
+        });
+
+        Schema::table('alumni', function (Blueprint $table) {
             $table->string('organisasi')->nullable()->after('pekerjaan');
             $table->string('fakultas')->nullable()->after('organisasi');
+            $table->string('email_kampus')->nullable()->after('email');
+            $table->string('email_pribadi')->nullable()->after('email_kampus');
             $table->string('tempat_lahir')->nullable()->after('alamat');
             $table->date('tanggal_lahir')->nullable()->after('tempat_lahir');
             $table->string('agama')->nullable()->after('tanggal_lahir');
@@ -26,6 +32,7 @@ return new class extends Migration
             $table->string('nama_ayah')->nullable()->after('status_bekerja');
             $table->string('nama_ibu')->nullable()->after('nama_ayah');
             $table->string('no_telepon_orang_tua', 30)->nullable()->after('nama_ibu');
+            $table->string('link_dokumen_tambahan')->nullable()->after('no_telepon_orang_tua');
         });
     }
 
@@ -35,6 +42,8 @@ return new class extends Migration
             $table->dropColumn([
                 'organisasi',
                 'fakultas',
+                'email_kampus',
+                'email_pribadi',
                 'tempat_lahir',
                 'tanggal_lahir',
                 'agama',
@@ -50,7 +59,9 @@ return new class extends Migration
                 'nama_ayah',
                 'nama_ibu',
                 'no_telepon_orang_tua',
+                'link_dokumen_tambahan',
             ]);
+            $table->unsignedSmallInteger('angkatan')->nullable();
         });
     }
 };

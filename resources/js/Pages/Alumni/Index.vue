@@ -69,12 +69,6 @@ const destroy = (id, nama) => {
                 <h2 class="text-xl font-semibold leading-tight text-gray-800">
                     Data Alumni
                 </h2>
-                <Link
-                    :href="route('alumni.create')"
-                    class="inline-flex rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-500"
-                >
-                    Tambah Alumni
-                </Link>
             </div>
         </template>
 

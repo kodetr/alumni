@@ -230,8 +230,9 @@ const extractPreviewRows = (result) => {
                     toAbsolutePhotoUrl(item?.photo_path) ||
                     toAbsolutePhotoUrl(item?.photo_3x4_path) ||
                     previewFallbackPhoto(nama),
-                angkatan: item?.intake_year ? Number(item.intake_year) : '',
                 email: cleanString(item?.personal_email || item?.campus_email) || null,
+                email_kampus: cleanString(item?.campus_email) || null,
+                email_pribadi: cleanString(item?.personal_email) || null,
                 no_telepon: cleanString(item?.phone_number) || null,
                 tahun_lulus: parseGraduationYear(item),
                 pekerjaan:
@@ -260,6 +261,10 @@ const extractPreviewRows = (result) => {
                 nama_ayah: cleanString(item?.father_name) || null,
                 nama_ibu: cleanString(item?.mother_name) || null,
                 no_telepon_orang_tua: cleanString(item?.parent_phone) || null,
+                link_dokumen_tambahan: item?.extra_document_link || 
+                    item?.extra_document || 
+                    item?.document_link || 
+                    item?.additional_document_link || null,
 
                 integration_payload: item,
             };
@@ -367,8 +372,9 @@ const savePreviewToAlumni = async () => {
                 nim: item.nim,
                 nama: item.nama,
               jurisdiction: item.jurusan,
-                angkatan: item.tahun_lulus,
                 email: item.email,
+                email_kampus: item.email_kampus,
+                email_pribadi: item.email_pribadi,
                 photo_url: item.has_api_photo ? item.photo_url : null,
                 no_telepon: item.no_telepon,
                 tahun_lulus: item.tahun_lulus,
@@ -393,6 +399,7 @@ const savePreviewToAlumni = async () => {
                 nama_ayah: item.nama_ayah,
                 nama_ibu: item.nama_ibu,
                 no_telepon_orang_tua: item.no_telepon_orang_tua,
+                link_dokumen_tambahan: item.link_dokumen_tambahan,
 
                 integration_payload: item.integration_payload,
         })),
@@ -409,7 +416,7 @@ const savePreviewToAlumni = async () => {
             fireSuccessAlert('Data alumni tersimpan', page.props.flash?.success ?? 'Data alumni berhasil disimpan.');
         },
         onError: () => {
-            fireErrorAlert('Validasi gagal', 'Periksa data preview dan lengkapi input angkatan yang belum valid.');
+            fireErrorAlert('Validasi gagal', 'Periksa data preview dan coba lagi.');
         },
         onFinish: () => {
             alumniPreviewForm.transform((data) => data);
@@ -814,7 +821,6 @@ onBeforeUnmount(() => {
                                     <th class="px-4 py-3 text-left font-semibold text-gray-700">Foto</th>
                                     <th class="px-4 py-3 text-left font-semibold text-gray-700">NIM</th>
                                     <th class="px-4 py-3 text-left font-semibold text-gray-700">Nama</th>
-                                    <th class="px-4 py-3 text-left font-semibold text-gray-700">Jurusan</th>
                                     <th class="px-4 py-3 text-left font-semibold text-gray-700">Program Studi</th>
                                     <th class="px-4 py-3 text-left font-semibold text-gray-700">Fakultas</th>
                                     <th class="px-4 py-3 text-left font-semibold text-gray-700">Tahun Lulus</th>
@@ -836,7 +842,6 @@ onBeforeUnmount(() => {
                                     </td>
                                     <td class="px-4 py-3 font-medium text-gray-800">{{ item.nim }}</td>
                                     <td class="px-4 py-3 text-gray-700">{{ item.nama }}</td>
-                                    <td class="px-4 py-3 text-gray-600">{{ item.jurusan }}</td>
                                     <td class="px-4 py-3 text-gray-600">{{ item.organisasi || '-' }}</td>
                                     <td class="px-4 py-3 text-gray-600">{{ item.fakultas || '-' }}</td>
                                     <td class="px-4 py-3 text-sm font-semibold text-slate-700">{{ item.tahun_lulus || '-' }}</td>
@@ -900,10 +905,6 @@ onBeforeUnmount(() => {
                                 <p class="font-medium text-gray-900">{{ selectedDetailItem.nama }}</p>
                             </div>
                             <div>
-                                <p class="text-xs text-gray-500">Jurusan</p>
-                                <p class="font-medium text-gray-900">{{ selectedDetailItem.jurusan }}</p>
-                            </div>
-                            <div>
                                 <p class="text-xs text-gray-500">Program Studi</p>
                                 <p class="font-medium text-gray-900">{{ selectedDetailItem.organisasi || '-' }}</p>
                             </div>
@@ -916,8 +917,12 @@ onBeforeUnmount(() => {
                                 <p class="font-medium text-gray-900">{{ selectedDetailItem.tahun_lulus || '-' }}</p>
                             </div>
                             <div>
-                                <p class="text-xs text-gray-500">Email</p>
-                                <p class="font-medium text-gray-900">{{ selectedDetailItem.email || '-' }}</p>
+                                <p class="text-xs text-gray-500">Email Kampus</p>
+                                <p class="font-medium text-gray-900">{{ selectedDetailItem.email_kampus || '-' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">Email Pribadi</p>
+                                <p class="font-medium text-gray-900">{{ selectedDetailItem.email_pribadi || '-' }}</p>
                             </div>
                             <div>
                                 <p class="text-xs text-gray-500">Tempat Lahir</p>
@@ -1002,6 +1007,16 @@ onBeforeUnmount(() => {
                             <div>
                                 <p class="text-xs text-gray-500">No. Telepon Orang Tua</p>
                                 <p class="font-medium text-gray-900">{{ selectedDetailItem.no_telepon_orang_tua || '-' }}</p>
+                            </div>
+                            <div v-if="selectedDetailItem.link_dokumen_tambahan" class="sm:col-span-2">
+                                <p class="text-xs text-gray-500">Link Dokumen Tambahan</p>
+                                <a
+                                    :href="selectedDetailItem.link_dokumen_tambahan"
+                                    target="_blank"
+                                    class="font-medium text-indigo-600 hover:text-indigo-800"
+                                >
+                                    {{ selectedDetailItem.link_dokumen_tambahan }}
+                                </a>
                             </div>
                         </div>
 
