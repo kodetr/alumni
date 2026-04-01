@@ -32,7 +32,7 @@ const formatDate = (value) => {
 
     <div class="min-h-screen bg-slate-50 text-slate-900">
         <header class="border-b border-slate-200 bg-white">
-            <div class="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-5 lg:px-8">
+            <div class="flex w-full items-center justify-between px-6 py-5 lg:px-8">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">Universitas Bumigora</p>
                     <p class="mt-1 text-lg font-semibold text-slate-900">Portal Alumni</p>

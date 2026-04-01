@@ -130,7 +130,7 @@ const toggleBlock = async (item) => {
         </template>
 
         <div class="py-10">
-            <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
+            <div class="w-full space-y-6 px-4 sm:px-6 lg:px-8">
                 <div class="rounded-lg bg-white p-4 shadow-sm">
                     <form
                         class="grid gap-4 md:grid-cols-6"

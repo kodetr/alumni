@@ -711,7 +711,7 @@ onBeforeUnmount(() => {
         </template>
 
         <div class="py-10">
-            <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
+            <div class="w-full space-y-6 px-4 sm:px-6 lg:px-8">
                 <div class="rounded-lg bg-white p-6 shadow-sm">
                     <h3 class="text-lg font-semibold text-gray-900">Ambil Data Alumni</h3>
                     <p class="mt-1 text-sm text-gray-600">

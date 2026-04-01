@@ -76,7 +76,7 @@ const formatDate = (value) => {
             <div class="hero-glow"></div>
 
             <header class="relative z-10">
-                <div class="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-6 lg:px-8">
+                <div class="flex w-full items-center justify-between px-6 py-6 lg:px-8">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-700">
                             Universitas Bumigora
