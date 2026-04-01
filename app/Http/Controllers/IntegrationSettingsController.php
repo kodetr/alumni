@@ -6,10 +6,12 @@ use App\Http\Requests\FetchIntegrationMenuDataRequest;
 use App\Http\Requests\StoreAlumniPreviewRequest;
 use App\Models\Alumni;
 use App\Models\IntegrationSetting;
+use App\Support\AlumniMaintenanceService;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -24,9 +26,12 @@ use Throwable;
 
 class IntegrationSettingsController extends Controller
 {
+    public function __construct(private readonly AlumniMaintenanceService $maintenance) {}
+
     public function index(): Response
     {
         $defaults = $this->integrationDefaults();
+        $maintenanceStatus = $this->maintenance->status();
 
         return Inertia::render('Settings/Integration', [
             'defaults' => [
@@ -40,7 +45,39 @@ class IntegrationSettingsController extends Controller
             'databaseError' => session('databaseError'),
             'databaseBackups' => $this->listDatabaseBackups(),
             'connectionStatus' => Cache::get($this->statusCacheKey()),
+            'maintenance' => [
+                'enabled' => $maintenanceStatus['enabled'],
+                'ends_at' => $maintenanceStatus['ends_at'],
+                'remaining_seconds' => $maintenanceStatus['remaining_seconds'],
+            ],
         ]);
+    }
+
+    public function updateMaintenance(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'enabled' => ['required', 'boolean'],
+            'duration_minutes' => ['nullable', 'integer', 'min:1', 'max:10080'],
+        ]);
+
+        $enabled = (bool) $validated['enabled'];
+
+        if ($enabled) {
+            $durationMinutes = (int) ($validated['duration_minutes'] ?? 60);
+            $this->maintenance->activate($durationMinutes);
+            $status = $this->maintenance->status();
+            $endsAtLabel = $status['ends_at']
+                ? Carbon::parse($status['ends_at'])->format('d M Y H:i')
+                : '-';
+
+            return to_route('settings.integration.index')
+                ->with('success', "Mode maintenance alumni aktif sampai {$endsAtLabel}.");
+        }
+
+        $this->maintenance->deactivate();
+
+        return to_route('settings.integration.index')
+            ->with('success', 'Mode maintenance alumni dinonaktifkan.');
     }
 
     public function testConnection(FetchIntegrationMenuDataRequest $request): RedirectResponse
@@ -116,7 +153,12 @@ class IntegrationSettingsController extends Controller
     public function storeAlumniPreview(StoreAlumniPreviewRequest $request): RedirectResponse
     {
         $validated = $request->validated();
-        $records = $validated['records'] ?? Cache::get($this->previewRecordsCacheKey($request->user()?->id), []);
+        $cachedRecords = Cache::get($this->previewRecordsCacheKey($request->user()?->id), []);
+        $submittedRecords = $validated['records'] ?? [];
+
+        $records = is_array($cachedRecords) && $cachedRecords !== []
+            ? $cachedRecords
+            : $submittedRecords;
 
         if (! is_array($records) || $records === []) {
             return to_route('settings.integration.index')
@@ -146,7 +188,6 @@ class IntegrationSettingsController extends Controller
                             ?? $record['faculty_name']
                             ?? '-'
                     ));
-                    $instansi = $this->nullableString($record['instansi'] ?? $record['instancia'] ?? null);
                     $statusBekerja = $record['status_bekerja'] ?? $record['is_employed'] ?? null;
 
                     if (is_string($statusBekerja)) {
@@ -174,7 +215,6 @@ class IntegrationSettingsController extends Controller
                             'pekerjaan' => $this->nullableString($record['pekerjaan'] ?? null),
                             'organisasi' => $this->nullableString($record['organisasi'] ?? null),
                             'fakultas' => $this->nullableString($record['fakultas'] ?? $record['faculty_name'] ?? null),
-                            'instansi' => $instansi,
                             'alamat' => $this->nullableString($record['alamat'] ?? null),
                             'integration_payload' => isset($record['integration_payload']) && is_array($record['integration_payload'])
                                 ? $this->filterIntegrationPayload($record['integration_payload'])
@@ -182,7 +222,7 @@ class IntegrationSettingsController extends Controller
                             'tempat_lahir' => $this->nullableString($record['tempat_lahir'] ?? $record['birth_place'] ?? null),
                             'tanggal_lahir' => $this->parseDate($record['tanggal_lahir'] ?? $record['birth_date'] ?? null),
                             'agama' => $this->nullableString($record['agama'] ?? $record['religion'] ?? null),
-                            'jenis_kelamin' => $this->nullableString($record['jenis_kelamin'] ?? $record['gender'] ?? null),
+                            'jenis_kelamin' => $this->normalizeGender($record['jenis_kelamin'] ?? $record['gender'] ?? null),
                             'no_ktp' => $this->nullableString($record['no_ktp'] ?? $record['ktp_number'] ?? null),
                             'ipk' => isset($record['ipk']) ? (float) $record['ipk'] : null,
                             'predikat' => $this->nullableString($record['predikat'] ?? $record['predicate'] ?? null),
@@ -519,12 +559,11 @@ class IntegrationSettingsController extends Controller
                     : null,
                 'organisasi' => $this->nullableString($row['study_program_name'] ?? null),
                 'fakultas' => $this->nullableString($row['faculty_name'] ?? null),
-                'instansi' => null,
                 'alamat' => $this->nullableString($row['full_address'] ?? null),
                 'tempat_lahir' => $this->nullableString($row['birth_place'] ?? null),
                 'tanggal_lahir' => $this->parseDate($row['birth_date'] ?? null),
                 'agama' => $this->nullableString($row['religion'] ?? null),
-                'jenis_kelamin' => $this->nullableString($row['gender'] ?? null),
+                'jenis_kelamin' => $this->normalizeGender($row['jenis_kelamin'] ?? $row['gender'] ?? null),
                 'no_ktp' => $this->nullableString($row['ktp_number'] ?? null),
                 'ipk' => isset($row['ipk']) && $row['ipk'] !== '' ? (float) $row['ipk'] : null,
                 'predikat' => $this->nullableString($row['predicate'] ?? null),
@@ -1173,6 +1212,21 @@ class IntegrationSettingsController extends Controller
         $trimmed = trim($value);
 
         return $trimmed !== '' ? $trimmed : null;
+    }
+
+    private function normalizeGender(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $normalized = strtolower(trim($value));
+
+        return match ($normalized) {
+            'l', 'lk', 'laki-laki', 'laki laki', 'male', 'm', 'pria' => 'L',
+            'p', 'pr', 'perempuan', 'female', 'f', 'wanita' => 'P',
+            default => null,
+        };
     }
 
     private function parseDate(mixed $value): ?string

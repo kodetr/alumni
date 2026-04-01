@@ -12,6 +12,8 @@ class IntegrationSetting extends Model
     protected $fillable = [
         'endpoint',
         'api_key',
+        'maintenance_enabled',
+        'maintenance_ends_at',
     ];
 
     /**
@@ -19,5 +21,7 @@ class IntegrationSetting extends Model
      */
     protected $casts = [
         'api_key' => 'encrypted',
+        'maintenance_enabled' => 'boolean',
+        'maintenance_ends_at' => 'datetime',
     ];
 }

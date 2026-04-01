@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AdminUserController;
 use App\Http\Controllers\AlumniController;
+use App\Http\Controllers\AlumniMaintenanceController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\IntegrationSettingsController;
 use App\Http\Controllers\NewsPostController;
@@ -110,6 +111,9 @@ Route::get('/', function () {
 Route::get('/admin', fn () => redirect()->route('admin.login'))
     ->name('admin.entry');
 
+Route::get('/maintenance/alumni', [AlumniMaintenanceController::class, 'show'])
+    ->name('maintenance.alumni');
+
 Route::get('/dashboard', function () {
     $isAdmin = request()->user()?->isAdmin() ?? false;
 
@@ -128,9 +132,9 @@ Route::get('/dashboard', function () {
             'alumniTahunIni' => $alumniTahunIni,
         ],
     ]);
-})->middleware(['auth', 'alumni.active', 'verified'])->name('dashboard');
+})->middleware(['auth', 'alumni.maintenance', 'alumni.active', 'verified'])->name('dashboard');
 
-Route::middleware(['auth', 'alumni.active'])->group(function () {
+Route::middleware(['auth', 'alumni.maintenance', 'alumni.active'])->group(function () {
     Route::prefix('admin')->middleware(['verified', 'admin'])->group(function (): void {
         Route::resource('alumni', AlumniController::class)
             ->parameters(['alumni' => 'alumni']);
@@ -162,6 +166,8 @@ Route::middleware(['auth', 'alumni.active'])->group(function () {
             ->name('settings.integration.fetch');
         Route::post('pengaturan/integrasi/simpan-alumni', [IntegrationSettingsController::class, 'storeAlumniPreview'])
             ->name('settings.integration.store-alumni');
+        Route::post('pengaturan/maintenance', [IntegrationSettingsController::class, 'updateMaintenance'])
+            ->name('settings.maintenance.update');
         Route::post('pengaturan/database/backup', [IntegrationSettingsController::class, 'backupDatabase'])
             ->name('settings.database.backup');
         Route::post('pengaturan/database/restore', [IntegrationSettingsController::class, 'restoreDatabase'])

@@ -23,7 +23,6 @@ class Alumni extends Model
         'pekerjaan',
         'organisasi',
         'fakultas',
-        'instansi',
         'alamat',
         'integration_payload',
         'tempat_lahir',

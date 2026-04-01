@@ -33,7 +33,7 @@ const props = defineProps({
     },
     statusOptions: {
         type: Array,
-        default: () => ['all', 'active', 'blocked', 'no_account'],
+        default: () => ['all', 'active', 'blocked'],
     },
 });
 
@@ -65,7 +65,6 @@ const statusLabel = {
     all: 'Semua status',
     active: 'Akun aktif',
     blocked: 'Akun diblokir',
-    no_account: 'Belum punya akun',
 };
 
 const destroy = async (id, nama) => {
@@ -88,17 +87,6 @@ const destroy = async (id, nama) => {
 };
 
 const toggleBlock = async (item) => {
-    if (!item.has_user_account) {
-        await Swal.fire({
-            icon: 'info',
-            title: 'Akun belum tersedia',
-            text: 'Data alumni ini belum memiliki akun login.',
-            confirmButtonColor: '#4f46e5',
-        });
-
-        return;
-    }
-
     const isBlocking = !item.is_blocked;
     const result = await Swal.fire({
         icon: 'warning',
@@ -278,13 +266,7 @@ const toggleBlock = async (item) => {
                                     <td class="px-4 py-3 text-gray-700">{{ item.tahun_lulus || '-' }}</td>
                                     <td class="px-4 py-3">
                                         <span
-                                            v-if="!item.has_user_account"
-                                            class="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700"
-                                        >
-                                            Belum punya akun
-                                        </span>
-                                        <span
-                                            v-else-if="item.is_blocked"
+                                            v-if="item.is_blocked"
                                             class="inline-flex rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700"
                                         >
                                             Diblokir
@@ -304,15 +286,18 @@ const toggleBlock = async (item) => {
                                             >
                                                 Detail
                                             </Link>
+                                            <Link
+                                                :href="route('alumni.edit', item.id)"
+                                                class="rounded-md border border-indigo-200 px-2.5 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50"
+                                            >
+                                                Edit
+                                            </Link>
                                             <button
                                                 type="button"
-                                                class="rounded-md border px-2.5 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
-                                                :class="item.has_user_account
-                                                    ? (item.is_blocked
-                                                        ? 'border-green-200 text-green-700 hover:bg-green-50'
-                                                        : 'border-amber-200 text-amber-700 hover:bg-amber-50')
-                                                    : 'border-gray-200 text-gray-500'"
-                                                :disabled="!item.has_user_account"
+                                                class="rounded-md border px-2.5 py-1.5 text-xs font-medium transition"
+                                                :class="item.is_blocked
+                                                    ? 'border-green-200 text-green-700 hover:bg-green-50'
+                                                    : 'border-amber-200 text-amber-700 hover:bg-amber-50'"
                                                 @click="toggleBlock(item)"
                                             >
                                                 {{ item.is_blocked ? 'Aktifkan' : 'Blokir' }}

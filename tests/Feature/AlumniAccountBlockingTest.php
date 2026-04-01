@@ -51,6 +51,32 @@ class AlumniAccountBlockingTest extends TestCase
         ]);
     }
 
+    public function test_block_action_creates_alumni_account_when_missing(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $alumni = Alumni::query()->create([
+            'nama' => 'Alumni Baru',
+            'nim' => '2300000010',
+            'jurusan' => 'Teknik Industri',
+            'email_kampus' => 'alumni.baru@kampus.test',
+            'tahun_lulus' => 2026,
+        ]);
+
+        $this
+            ->actingAs($admin)
+            ->patch(route('alumni.block', $alumni), ['blocked' => true])
+            ->assertRedirect(route('alumni.index'))
+            ->assertSessionHas('success', 'Akun alumni Alumni Baru berhasil diblokir.');
+
+        $this->assertDatabaseHas('users', [
+            'role' => User::ROLE_ALUMNI,
+            'nim' => '2300000010',
+            'email' => 'alumni.baru@kampus.test',
+            'is_blocked' => true,
+        ]);
+    }
+
     public function test_alumni_role_cannot_block_other_alumni_account(): void
     {
         $actor = User::factory()->create([

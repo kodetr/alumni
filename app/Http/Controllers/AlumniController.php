@@ -10,7 +10,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -27,7 +29,7 @@ class AlumniController extends Controller
         $status = $request->string('status')->toString();
         $perPageOptions = [20, 30, 50, 100];
         $perPage = (int) $request->integer('per_page', 20);
-        $statusOptions = ['all', 'active', 'blocked', 'no_account'];
+        $statusOptions = ['all', 'active', 'blocked'];
 
         if ($tahunLulus !== '' && ! ctype_digit($tahunLulus)) {
             $tahunLulus = '';
@@ -71,13 +73,7 @@ class AlumniController extends Controller
                 }
 
                 if ($status === 'active') {
-                    $this->applyAccountExistsFilter($query, $canMatchByNim, $canMatchByEmail, $hasBlockedFlag, false);
-
-                    return;
-                }
-
-                if ($status === 'no_account') {
-                    $this->applyNoAccountFilter($query, $canMatchByNim, $canMatchByEmail);
+                    $this->applyNotBlockedFilter($query, $canMatchByNim, $canMatchByEmail, $hasBlockedFlag);
                 }
             })
             ->orderByDesc('tahun_lulus')
@@ -193,13 +189,17 @@ class AlumniController extends Controller
             'blocked' => ['required', 'boolean'],
         ]);
 
+        $isBlocked = (bool) $validated['blocked'];
+
         $user = $this->resolveAlumniUser($alumni);
 
         if (! $user) {
-            return to_route('alumni.index')->with('success', 'Akun login alumni belum tersedia untuk data ini.');
-        }
+            $user = $this->createAlumniUser($alumni, $isBlocked);
 
-        $isBlocked = (bool) $validated['blocked'];
+            if (! $user) {
+                return to_route('alumni.index')->with('success', 'Gagal membuat akun alumni otomatis. Lengkapi data NIM atau email alumni terlebih dahulu.');
+            }
+        }
 
         $user->forceFill([
             'is_blocked' => $isBlocked,
@@ -274,10 +274,14 @@ class AlumniController extends Controller
     private function resolveAlumniUser(Alumni $alumni): ?User
     {
         if (Schema::hasColumn('users', 'nim')) {
-            return User::query()
+            $user = User::query()
                 ->where('role', User::ROLE_ALUMNI)
                 ->where('nim', $alumni->nim)
                 ->first();
+
+            if ($user) {
+                return $user;
+            }
         }
 
         if (
@@ -302,6 +306,110 @@ class AlumniController extends Controller
         }
 
         return null;
+    }
+
+    private function createAlumniUser(Alumni $alumni, bool $blocked): ?User
+    {
+        $attributes = [];
+
+        if (Schema::hasColumn('users', 'role')) {
+            $attributes['role'] = User::ROLE_ALUMNI;
+        }
+
+        if (Schema::hasColumn('users', 'name')) {
+            $name = trim((string) $alumni->nama);
+            $attributes['name'] = $name !== '' ? $name : 'Alumni '.$alumni->nim;
+        }
+
+        if (Schema::hasColumn('users', 'nim')) {
+            $nim = trim((string) $alumni->nim);
+
+            if ($nim !== '') {
+                $attributes['nim'] = $nim;
+            }
+        }
+
+        if (Schema::hasColumn('users', 'tanggal_lahir')) {
+            $attributes['tanggal_lahir'] = $alumni->tanggal_lahir?->toDateString();
+        }
+
+        if (Schema::hasColumn('users', 'email')) {
+            $attributes['email'] = $this->resolveGeneratedEmail($alumni);
+
+            if (! $attributes['email']) {
+                return null;
+            }
+        }
+
+        if (Schema::hasColumn('users', 'password')) {
+            $attributes['password'] = Hash::make(Str::random(40));
+        }
+
+        if (Schema::hasColumn('users', 'is_blocked')) {
+            $attributes['is_blocked'] = $blocked;
+        }
+
+        if ($attributes === []) {
+            return null;
+        }
+
+        return User::query()->create($attributes);
+    }
+
+    private function resolveGeneratedEmail(Alumni $alumni): ?string
+    {
+        $candidates = collect([
+            $alumni->email_kampus,
+            $alumni->email_pribadi,
+            trim((string) $alumni->nim) !== '' ? 'alumni.'.trim((string) $alumni->nim).'@local.alumni' : null,
+        ])
+            ->filter(fn ($value) => is_string($value) && trim($value) !== '')
+            ->map(fn (string $value) => strtolower(trim($value)))
+            ->unique()
+            ->values();
+
+        foreach ($candidates as $candidate) {
+            if (! User::query()->where('email', $candidate)->exists()) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private function applyNotBlockedFilter(Builder $query, bool $canMatchByNim, bool $canMatchByEmail, bool $hasBlockedFlag): void
+    {
+        if (! $hasBlockedFlag) {
+            return;
+        }
+
+        if ($canMatchByNim) {
+            $query->whereNotExists(function ($subQuery): void {
+                $subQuery
+                    ->selectRaw('1')
+                    ->from('users')
+                    ->where('users.role', User::ROLE_ALUMNI)
+                    ->where('users.is_blocked', true)
+                    ->whereColumn('users.nim', 'alumni.nim');
+            });
+
+            return;
+        }
+
+        if ($canMatchByEmail) {
+            $query->whereNotExists(function ($subQuery): void {
+                $subQuery
+                    ->selectRaw('1')
+                    ->from('users')
+                    ->where('users.role', User::ROLE_ALUMNI)
+                    ->where('users.is_blocked', true)
+                    ->where(function ($emailQuery): void {
+                        $emailQuery
+                            ->whereColumn('users.email', 'alumni.email_kampus')
+                            ->orWhereColumn('users.email', 'alumni.email_pribadi');
+                    });
+            });
+        }
     }
 
     private function resolveAccountLookupKey(Alumni $alumni): string

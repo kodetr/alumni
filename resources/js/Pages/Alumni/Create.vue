@@ -13,7 +13,6 @@ const form = useForm({
     jurusan: '',
     tahun_lulus: '',
     pekerjaan: '',
-    instansi: '',
     alamat: '',
 });
 
@@ -70,12 +69,6 @@ const submit = () => {
                             <InputLabel for="pekerjaan" value="Pekerjaan" />
                             <TextInput id="pekerjaan" type="text" class="mt-1 block w-full" v-model="form.pekerjaan" />
                             <InputError class="mt-2" :message="form.errors.pekerjaan" />
-                        </div>
-
-                        <div class="md:col-span-2">
-                            <InputLabel for="instansi" value="Instansi / Perusahaan" />
-                            <TextInput id="instansi" type="text" class="mt-1 block w-full" v-model="form.instansi" />
-                            <InputError class="mt-2" :message="form.errors.instansi" />
                         </div>
 
                         <div class="md:col-span-2">

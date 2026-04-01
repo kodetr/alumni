@@ -32,7 +32,6 @@ class StoreAlumniRequest extends FormRequest
             'jurusan' => ['required', 'string', 'max:255'],
             'tahun_lulus' => ['nullable', 'integer', 'digits:4', 'between:1900,'.($maxYear + 6)],
             'pekerjaan' => ['nullable', 'string', 'max:255'],
-            'instansi' => ['nullable', 'string', 'max:255'],
             'alamat' => ['nullable', 'string', 'max:1000'],
         ];
     }

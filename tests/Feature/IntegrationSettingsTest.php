@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Alumni;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -255,7 +256,6 @@ class IntegrationSettingsTest extends TestCase
                         'no_telepon' => '08123456789',
                         'tahun_lulus' => 2026,
                         'pekerjaan' => null,
-                        'instansi' => null,
                         'alamat' => 'Bandung',
                         'integration_payload' => [
                             'full_name' => 'Wisudawan 1',
@@ -270,7 +270,6 @@ class IntegrationSettingsTest extends TestCase
                         'no_telepon' => null,
                         'tahun_lulus' => 2026,
                         'pekerjaan' => null,
-                        'instansi' => null,
                         'alamat' => null,
                         'integration_payload' => [
                             'full_name' => 'Wisudawan 2',
@@ -300,5 +299,86 @@ class IntegrationSettingsTest extends TestCase
         $this->assertDatabaseCount('alumni', 2);
 
         $this->assertSame(2, Alumni::query()->count());
+    }
+
+    public function test_store_alumni_uses_cached_preview_records_when_request_records_are_partial(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        Cache::put('integration.preview.records.user.'.$admin->id, [
+            [
+                'nim' => '2300000101',
+                'nama' => 'Wisudawan Cache 1',
+                'jurusan' => 'Teknik Industri',
+                'email_kampus' => 'cache1@kampus.test',
+                'tahun_lulus' => 2026,
+                'integration_payload' => ['full_name' => 'Wisudawan Cache 1'],
+            ],
+            [
+                'nim' => '2300000102',
+                'nama' => 'Wisudawan Cache 2',
+                'jurusan' => 'Administrasi Publik',
+                'email_kampus' => 'cache2@kampus.test',
+                'tahun_lulus' => 2026,
+                'integration_payload' => ['full_name' => 'Wisudawan Cache 2'],
+            ],
+        ], now()->addHour());
+
+        $response = $this
+            ->actingAs($admin)
+            ->post(route('settings.integration.store-alumni'), [
+                'records' => [
+                    [
+                        'nim' => '2300000101',
+                        'nama' => 'Wisudawan Request',
+                        'jurusan' => 'Tidak Dipakai',
+                    ],
+                ],
+            ]);
+
+        $response
+            ->assertRedirect(route('settings.integration.index'))
+            ->assertSessionHas('success', '2 data alumni berhasil disimpan. (2 baru, 0 diperbarui)');
+
+        $this->assertDatabaseHas('alumni', [
+            'nim' => '2300000101',
+            'nama' => 'Wisudawan Cache 1',
+            'email_kampus' => 'cache1@kampus.test',
+        ]);
+
+        $this->assertDatabaseHas('alumni', [
+            'nim' => '2300000102',
+            'nama' => 'Wisudawan Cache 2',
+            'email_kampus' => 'cache2@kampus.test',
+        ]);
+    }
+
+    public function test_store_alumni_normalizes_gender_before_save(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        Cache::put('integration.preview.records.user.'.$admin->id, [
+            [
+                'nim' => '2300000111',
+                'nama' => 'Wisudawan Gender',
+                'jurusan' => 'Teknik Industri',
+                'jenis_kelamin' => 'male',
+                'integration_payload' => ['gender' => 'male'],
+            ],
+        ], now()->addHour());
+
+        $response = $this
+            ->actingAs($admin)
+            ->post(route('settings.integration.store-alumni'));
+
+        $response
+            ->assertRedirect(route('settings.integration.index'))
+            ->assertSessionHas('success', '1 data alumni berhasil disimpan. (1 baru, 0 diperbarui)');
+
+        $this->assertDatabaseHas('alumni', [
+            'nim' => '2300000111',
+            'nama' => 'Wisudawan Gender',
+            'jenis_kelamin' => 'L',
+        ]);
     }
 }

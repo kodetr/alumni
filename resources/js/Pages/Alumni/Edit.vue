@@ -16,11 +16,13 @@ const props = defineProps({
 const form = useForm({
     nama: props.alumni.nama ?? '',
     nim: props.alumni.nim ?? '',
+    tanggal_lahir: typeof props.alumni.tanggal_lahir === 'string'
+        ? props.alumni.tanggal_lahir.split('T')[0]
+        : '',
     no_telepon: props.alumni.no_telepon ?? '',
     jurusan: props.alumni.jurusan ?? '',
     tahun_lulus: props.alumni.tahun_lulus?.toString() ?? '',
     pekerjaan: props.alumni.pekerjaan ?? '',
-    instansi: props.alumni.instansi ?? '',
     alamat: props.alumni.alamat ?? '',
 });
 
@@ -56,6 +58,12 @@ const submit = () => {
                         </div>
 
                         <div>
+                            <InputLabel for="tanggal_lahir" value="Tanggal Lahir" />
+                            <TextInput id="tanggal_lahir" type="date" class="mt-1 block w-full" v-model="form.tanggal_lahir" />
+                            <InputError class="mt-2" :message="form.errors.tanggal_lahir" />
+                        </div>
+
+                        <div>
                             <InputLabel for="no_telepon" value="No. Telepon" />
                             <TextInput id="no_telepon" type="text" class="mt-1 block w-full" v-model="form.no_telepon" />
                             <InputError class="mt-2" :message="form.errors.no_telepon" />
@@ -77,12 +85,6 @@ const submit = () => {
                             <InputLabel for="pekerjaan" value="Pekerjaan" />
                             <TextInput id="pekerjaan" type="text" class="mt-1 block w-full" v-model="form.pekerjaan" />
                             <InputError class="mt-2" :message="form.errors.pekerjaan" />
-                        </div>
-
-                        <div class="md:col-span-2">
-                            <InputLabel for="instansi" value="Instansi / Perusahaan" />
-                            <TextInput id="instansi" type="text" class="mt-1 block w-full" v-model="form.instansi" />
-                            <InputError class="mt-2" :message="form.errors.instansi" />
                         </div>
 
                         <div class="md:col-span-2">

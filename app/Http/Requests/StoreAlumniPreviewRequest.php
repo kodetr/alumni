@@ -22,7 +22,6 @@ class StoreAlumniPreviewRequest extends FormRequest
             'records.*.no_telepon' => ['nullable', 'string', 'max:30'],
             'records.*.tahun_lulus' => ['nullable', 'integer', 'between:1900,2100'],
             'records.*.pekerjaan' => ['nullable', 'string', 'max:255'],
-            'records.*.instansi' => ['nullable', 'string', 'max:255'],
             'records.*.alamat' => ['nullable', 'string'],
             'records.*.integration_payload' => ['nullable', 'array'],
         ];

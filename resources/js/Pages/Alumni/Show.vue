@@ -188,10 +188,6 @@ const documentLink = computed(() => {
                             <p class="text-xs text-gray-500">Pekerjaan</p>
                             <p class="font-medium text-gray-900">{{ displayValue(alumni.pekerjaan) }}</p>
                         </div>
-                        <div>
-                            <p class="text-xs text-gray-500">Instansi</p>
-                            <p class="font-medium text-gray-900">{{ displayValue(alumni.instansi) }}</p>
-                        </div>
                         <div class="sm:col-span-2">
                             <p class="text-xs text-gray-500">Alamat</p>
                             <p class="font-medium text-gray-900">{{ displayValue(alumni.alamat) }}</p>

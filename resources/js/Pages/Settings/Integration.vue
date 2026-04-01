@@ -36,11 +36,25 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    maintenance: {
+        type: Object,
+        default: () => ({
+            enabled: false,
+            ends_at: null,
+            remaining_seconds: null,
+        }),
+    },
 });
 
 const form = useForm({
     endpoint: props.defaults.endpoint ?? '',
     api_key: props.defaults.api_key ?? '',
+});
+const maintenanceForm = useForm({
+    enabled: Boolean(props.maintenance?.enabled ?? false),
+    duration_minutes: String(props.maintenance?.remaining_seconds
+        ? Math.max(1, Math.ceil(props.maintenance.remaining_seconds / 60))
+        : 60),
 });
 const backupForm = useForm({});
 const restoreForm = useForm({
@@ -64,7 +78,9 @@ const photoFitMode = ref('cover');
 const fetchProgress = ref(0);
 const detailModalOpen = ref(false);
 const selectedDetailItem = ref(null);
+const maintenanceRemainingSeconds = ref(props.maintenance?.remaining_seconds ?? null);
 let fetchProgressTimer = null;
+let maintenanceTimer = null;
 
 const openDetailModal = (item) => {
     selectedDetailItem.value = item;
@@ -121,6 +137,19 @@ const openApiResultDialog = (result = props.integrationResult) => {
 };
 
 const hasPreviewRows = computed(() => alumniPreviewForm.records.length > 0);
+const maintenanceCountdown = computed(() => {
+    if (maintenanceRemainingSeconds.value === null || maintenanceRemainingSeconds.value < 0) {
+        return '-';
+    }
+
+    const total = maintenanceRemainingSeconds.value;
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const seconds = total % 60;
+    const pad = (value) => String(value).padStart(2, '0');
+
+    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+});
 const visiblePreviewRows = computed(() => {
     if (!previewOnlyWithPhoto.value) {
         return alumniPreviewForm.records;
@@ -242,7 +271,6 @@ const extractPreviewRows = (result) => {
                           : null,
                 organisasi: cleanString(item?.study_program_name) || null,
                 fakultas: cleanString(item?.faculty_name) || null,
-                instansi: null,
                 alamat: cleanString(item?.full_address) || null,
 
                 tempat_lahir: cleanString(item?.birth_place) || null,
@@ -363,59 +391,27 @@ const savePreviewToAlumni = async () => {
 
     activeAction.value = 'store-alumni';
 
-    alumniPreviewForm.transform(() => ({
-        records: alumniPreviewForm.records.map((item) => ({
-            nim: item.nim,
-            nama: item.nama,
-            jurusan: item.jurusan,
-            email_kampus: item.email_kampus,
-            email_pribadi: item.email_pribadi,
-            photo_url: item.has_api_photo ? item.photo_url : null,
-            no_telepon: item.no_telepon,
-            tahun_lulus: item.tahun_lulus,
-            pekerjaan: item.pekerjaan,
-            organisasi: item.organisasi,
-            fakultas: item.fakultas,
-            instansi: item.instansi,
-            alamat: item.alamat,
-            tempat_lahir: item.tempat_lahir,
-            tanggal_lahir: item.tanggal_lahir,
-            agama: item.agama,
-            jenis_kelamin: item.jenis_kelamin,
-            no_ktp: item.no_ktp,
-            ipk: item.ipk,
-            predikat: item.predikat,
-            judul_skripsi: item.judul_skripsi,
-            pembimbing_1: item.pembimbing_1,
-            pembimbing_2: item.pembimbing_2,
-            ukuran_toga: item.ukuran_toga,
-            status_bekerja: item.status_bekerja,
-            nama_ayah: item.nama_ayah,
-            nama_ibu: item.nama_ibu,
-            no_telepon_orang_tua: item.no_telepon_orang_tua,
-            link_dokumen_tambahan: item.link_dokumen_tambahan,
-            integration_payload: item.integration_payload,
-        })),
-    }))
+    alumniPreviewForm
+        .transform(() => ({}))
         .post(route('settings.integration.store-alumni'), {
-        preserveScroll: true,
-        onSuccess: (page) => {
-            if (page.props.integrationError) {
-                fireErrorAlert('Gagal simpan data alumni', page.props.integrationError);
+            preserveScroll: true,
+            onSuccess: (page) => {
+                if (page.props.integrationError) {
+                    fireErrorAlert('Gagal simpan data alumni', page.props.integrationError);
 
-                return;
-            }
+                    return;
+                }
 
-            fireSuccessAlert('Data alumni tersimpan', page.props.flash?.success ?? 'Data alumni berhasil disimpan.');
-        },
-        onError: () => {
-            fireErrorAlert('Validasi gagal', 'Periksa data preview dan coba lagi.');
-        },
-        onFinish: () => {
-            alumniPreviewForm.transform((data) => data);
-            activeAction.value = '';
-        },
-    });
+                fireSuccessAlert('Data alumni tersimpan', page.props.flash?.success ?? 'Data alumni berhasil disimpan.');
+            },
+            onError: () => {
+                fireErrorAlert('Validasi gagal', 'Periksa data preview dan coba lagi.');
+            },
+            onFinish: () => {
+                alumniPreviewForm.transform((data) => data);
+                activeAction.value = '';
+            },
+        });
 };
 
 const saveConfig = () => {
@@ -575,9 +571,103 @@ const importDatabase = () => {
     });
 };
 
+const updateMaintenance = async () => {
+    const isEnableAction = maintenanceForm.enabled;
+    const duration = Number(maintenanceForm.duration_minutes || 0);
+
+    if (isEnableAction && (!Number.isInteger(duration) || duration < 1)) {
+        fireErrorAlert('Durasi tidak valid', 'Durasi maintenance minimal 1 menit.');
+
+        return;
+    }
+
+    const confirmation = await Swal.fire({
+        icon: 'warning',
+        title: isEnableAction ? 'Aktifkan maintenance alumni?' : 'Nonaktifkan maintenance alumni?',
+        text: isEnableAction
+            ? `Alumni tidak bisa login/menggunakan aplikasi selama ${duration} menit.`
+            : 'Akses aplikasi alumni akan kembali normal.',
+        showCancelButton: true,
+        confirmButtonText: isEnableAction ? 'Ya, aktifkan' : 'Ya, nonaktifkan',
+        cancelButtonText: 'Batal',
+        confirmButtonColor: isEnableAction ? '#dc2626' : '#16a34a',
+        cancelButtonColor: '#6b7280',
+    });
+
+    if (!confirmation.isConfirmed) {
+        return;
+    }
+
+    activeAction.value = 'maintenance';
+
+    maintenanceForm
+        .transform(() => ({
+            enabled: Boolean(maintenanceForm.enabled),
+            duration_minutes: Number(maintenanceForm.duration_minutes || 0),
+        }))
+        .post(route('settings.maintenance.update'), {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                if (page.props.flash?.success) {
+                    fireSuccessAlert('Maintenance diperbarui', page.props.flash.success);
+                }
+            },
+            onError: () => {
+                fireErrorAlert('Gagal memperbarui maintenance', 'Periksa input durasi maintenance.');
+            },
+            onFinish: () => {
+                maintenanceForm.transform((data) => data);
+                activeAction.value = '';
+            },
+        });
+};
+
+watch(
+    () => props.maintenance,
+    (value) => {
+        maintenanceForm.enabled = Boolean(value?.enabled ?? false);
+        maintenanceRemainingSeconds.value = value?.remaining_seconds ?? null;
+
+        if (value?.enabled) {
+            const minutes = value?.remaining_seconds
+                ? Math.max(1, Math.ceil(value.remaining_seconds / 60))
+                : 60;
+            maintenanceForm.duration_minutes = String(minutes);
+        }
+    },
+    { immediate: true, deep: true },
+);
+
+watch(
+    () => maintenanceForm.enabled,
+    (enabled) => {
+        if (enabled && maintenanceTimer === null) {
+            maintenanceTimer = setInterval(() => {
+                if (maintenanceRemainingSeconds.value === null || maintenanceRemainingSeconds.value <= 0) {
+                    return;
+                }
+
+                maintenanceRemainingSeconds.value -= 1;
+            }, 1000);
+
+            return;
+        }
+
+        if (!enabled && maintenanceTimer) {
+            clearInterval(maintenanceTimer);
+            maintenanceTimer = null;
+        }
+    },
+    { immediate: true },
+);
+
 onBeforeUnmount(() => {
     if (fetchProgressTimer) {
         clearInterval(fetchProgressTimer);
+    }
+
+    if (maintenanceTimer) {
+        clearInterval(maintenanceTimer);
     }
 });
 </script>
@@ -713,6 +803,77 @@ onBeforeUnmount(() => {
                         <p class="mt-1">{{ integrationError }}</p>
                         <p v-if="integrationStatus" class="mt-1 text-xs text-red-600">
                             HTTP Status: {{ integrationStatus }}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="rounded-lg bg-white p-6 shadow-sm">
+                    <div class="flex flex-wrap items-start justify-between gap-4">
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900">Maintenance Mode Alumni</h3>
+                            <p class="mt-1 text-sm text-gray-600">
+                                Saat maintenance aktif, alumni tidak bisa login atau menggunakan dashboard sampai durasi selesai.
+                            </p>
+                        </div>
+                        <span
+                            class="inline-flex rounded-full px-3 py-1 text-xs font-semibold"
+                            :class="maintenanceForm.enabled ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'"
+                        >
+                            {{ maintenanceForm.enabled ? 'Maintenance Aktif' : 'Normal' }}
+                        </span>
+                    </div>
+
+                    <form class="mt-5 grid gap-4 md:grid-cols-3" @submit.prevent="updateMaintenance">
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-gray-700">
+                                Status Maintenance
+                            </label>
+                            <select
+                                v-model="maintenanceForm.enabled"
+                                class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            >
+                                <option :value="false">Nonaktif</option>
+                                <option :value="true">Aktif</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-gray-700">
+                                Durasi (menit)
+                            </label>
+                            <input
+                                v-model="maintenanceForm.duration_minutes"
+                                type="number"
+                                min="1"
+                                max="10080"
+                                class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                :disabled="!maintenanceForm.enabled"
+                            />
+                            <p v-if="maintenanceForm.errors.duration_minutes" class="mt-1 text-sm text-red-600">
+                                {{ maintenanceForm.errors.duration_minutes }}
+                            </p>
+                        </div>
+
+                        <div class="flex items-end">
+                            <button
+                                type="submit"
+                                class="w-full rounded-md px-4 py-2 text-sm font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-60"
+                                :class="maintenanceForm.enabled ? 'bg-red-600 hover:bg-red-500' : 'bg-emerald-600 hover:bg-emerald-500'"
+                                :disabled="maintenanceForm.processing"
+                            >
+                                {{ activeAction === 'maintenance' ? 'Memproses...' : (maintenanceForm.enabled ? 'Aktifkan Maintenance' : 'Nonaktifkan Maintenance') }}
+                            </button>
+                        </div>
+                    </form>
+
+                    <div
+                        v-if="maintenanceForm.enabled"
+                        class="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+                    >
+                        <p class="font-semibold">Akses alumni sedang dibatasi.</p>
+                        <p class="mt-1">Sisa waktu maintenance: <span class="font-semibold">{{ maintenanceCountdown }}</span></p>
+                        <p v-if="props.maintenance?.ends_at" class="mt-1 text-xs text-amber-700">
+                            Berakhir pada: {{ new Date(props.maintenance.ends_at).toLocaleString('id-ID') }}
                         </p>
                     </div>
                 </div>
