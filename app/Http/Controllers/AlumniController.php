@@ -349,6 +349,10 @@ class AlumniController extends Controller
             $attributes['is_blocked'] = $blocked;
         }
 
+        if (Schema::hasColumn('users', 'access_permissions')) {
+            $attributes['access_permissions'] = User::globalAlumniAccessPermissions();
+        }
+
         if ($attributes === []) {
             return null;
         }

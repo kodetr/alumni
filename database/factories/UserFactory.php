@@ -33,6 +33,7 @@ class UserFactory extends Factory
             'password' => static::$password ??= Hash::make('password'),
             'role' => User::ROLE_ALUMNI,
             'is_blocked' => false,
+            'access_permissions' => User::globalAlumniAccessPermissions(),
             'remember_token' => Str::random(10),
         ];
     }
@@ -51,6 +52,7 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'role' => User::ROLE_ADMIN,
+            'access_permissions' => null,
         ]);
     }
 }

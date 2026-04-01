@@ -1,0 +1,31 @@
+<?php
+
+namespace App\Http\Middleware;
+
+use App\Models\User;
+use Closure;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
+
+class EnsureUserHasPermission
+{
+    /**
+     * @param  Closure(Request): Response  $next
+     */
+    public function handle(Request $request, Closure $next, string $permission): Response
+    {
+        $user = $request->user();
+
+        if (! $user instanceof User) {
+            abort(Response::HTTP_FORBIDDEN);
+        }
+
+        if ($user->isAdmin()) {
+            return $next($request);
+        }
+
+        abort_unless($user->hasAccessPermission($permission), Response::HTTP_FORBIDDEN);
+
+        return $next($request);
+    }
+}

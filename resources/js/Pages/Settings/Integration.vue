@@ -1308,7 +1308,7 @@ onBeforeUnmount(() => {
                                 :disabled="!importForm.sql_file || backupForm.processing || restoreForm.processing || deleteForm.processing || importForm.processing"
                                 @click="importDatabase"
                             >
-                                {{ databaseAction === 'import' ? 'Mengimpor...' : 'Import SQL' }}
+                                {{ databaseAction === 'import' ? 'Mengimpor...' : 'Import' }}
                             </button>
                         </div>
 

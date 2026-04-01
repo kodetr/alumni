@@ -315,6 +315,12 @@ Route::middleware(['auth', 'alumni.maintenance', 'alumni.active'])->group(functi
             ->name('admin.users.create');
         Route::post('users', [AdminUserController::class, 'store'])
             ->name('admin.users.store');
+        Route::patch('users/permissions/global', [AdminUserController::class, 'updateGlobalPermissions'])
+            ->name('admin.users.permissions.update-global');
+        Route::post('users/permissions/sync-defaults', [AdminUserController::class, 'syncAlumniPermissions'])
+            ->name('admin.users.permissions.sync-defaults');
+        Route::patch('users/{user}/permissions', [AdminUserController::class, 'updatePermissions'])
+            ->name('admin.users.permissions.update');
         Route::delete('users/{user}', [AdminUserController::class, 'destroy'])
             ->name('admin.users.destroy');
         Route::get('pengaturan/integrasi', [IntegrationSettingsController::class, 'index'])
@@ -344,70 +350,97 @@ Route::middleware(['auth', 'alumni.maintenance', 'alumni.active'])->group(functi
 
     Route::prefix('jejaring-sosial')->name('social.')->group(function (): void {
         Route::get('/', fn () => redirect()->route('social.forum'))
+            ->middleware('permission:features.social_forum')
             ->name('index');
         Route::get('/forum-diskusi', fn () => Inertia::render('Social/Forum'))
+            ->middleware('permission:features.social_forum')
             ->name('forum');
         Route::get('/chat-antar-alumni', fn () => Inertia::render('Social/Chat'))
+            ->middleware('permission:features.social_chat')
             ->name('chat');
         Route::get('/grup-angkatan-jurusan', fn () => Inertia::render('Social/Groups'))
+            ->middleware('permission:features.social_groups')
             ->name('groups');
     });
 
     Route::prefix('karier')->name('career.')->group(function (): void {
         Route::get('/', fn () => redirect()->route('career.jobs'))
+            ->middleware('permission:features.career_jobs')
             ->name('index');
         Route::get('/posting-loker', fn () => Inertia::render('Career/Jobs'))
+            ->middleware('permission:features.career_jobs')
             ->name('jobs');
         Route::get('/career-center', fn () => Inertia::render('Career/Center'))
+            ->middleware('permission:features.career_center')
             ->name('center');
     });
 
     Route::prefix('event-alumni')->name('eventmenu.')->group(function (): void {
         Route::get('/', fn () => redirect()->route('eventmenu.reunion'))
+            ->middleware('permission:features.event_reunion')
             ->name('index');
         Route::get('/reuni', fn () => Inertia::render('EventMenu/Reunion'))
+            ->middleware('permission:features.event_reunion')
             ->name('reunion');
         Route::get('/webinar-seminar', fn () => Inertia::render('EventMenu/Webinar'))
+            ->middleware('permission:features.event_webinar')
             ->name('webinar');
         Route::get('/networking', fn () => Inertia::render('EventMenu/Networking'))
+            ->middleware('permission:features.event_networking')
             ->name('networking');
         Route::get('/rsvp-pendaftaran', fn () => Inertia::render('EventMenu/Rsvp'))
+            ->middleware('permission:features.event_rsvp')
             ->name('rsvp');
     });
 
     Route::prefix('mapping')->name('mapping.')->group(function (): void {
         Route::get('/', fn () => redirect()->route('mapping.locations'))
+            ->middleware('permission:features.mapping_locations')
             ->name('index');
         Route::get('/lokasi-alumni', fn () => Inertia::render('Mapping/Locations'))
+            ->middleware('permission:features.mapping_locations')
             ->name('locations');
         Route::get('/sebaran-global', fn () => Inertia::render('Mapping/Global'))
+            ->middleware('permission:features.mapping_global')
             ->name('global');
     });
 
     Route::prefix('donasi')->name('donation.')->group(function (): void {
         Route::get('/', fn () => redirect()->route('donation.online'))
+            ->middleware('permission:features.donation_online')
             ->name('index');
         Route::get('/online', fn () => Inertia::render('Donation/Online'))
+            ->middleware('permission:features.donation_online')
             ->name('online');
         Route::get('/program-beasiswa', fn () => Inertia::render('Donation/Scholarship'))
+            ->middleware('permission:features.donation_scholarship')
             ->name('scholarship');
         Route::get('/crowdfunding', fn () => Inertia::render('Donation/Crowdfunding'))
+            ->middleware('permission:features.donation_crowdfunding')
             ->name('crowdfunding');
     });
 
     Route::prefix('bisnis')->name('business.')->group(function (): void {
         Route::get('/', fn () => redirect()->route('business.marketplace'))
+            ->middleware('permission:features.business_marketplace')
             ->name('index');
         Route::get('/marketplace', fn () => Inertia::render('Business/Marketplace'))
+            ->middleware('permission:features.business_marketplace')
             ->name('marketplace');
         Route::get('/kerjasama', fn () => Inertia::render('Business/Partnership'))
+            ->middleware('permission:features.business_partnership')
             ->name('partnership');
         Route::get('/mentorship', fn () => Inertia::render('Business/Mentorship'))
+            ->middleware('permission:features.business_mentorship')
             ->name('mentorship');
     });
 
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::get('/profile', [ProfileController::class, 'edit'])
+        ->middleware('permission:features.profile_edit')
+        ->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])
+        ->middleware('permission:features.profile_edit')
+        ->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 

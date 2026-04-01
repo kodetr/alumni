@@ -38,6 +38,19 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'auth' => [
                 'user' => $request->user(),
+                'permissions' => function () use ($request): array {
+                    $user = $request->user();
+
+                    if (! $user instanceof User) {
+                        return [];
+                    }
+
+                    if ($user->isAdmin()) {
+                        return $this->allowAllPermissions(User::defaultAlumniAccessPermissions());
+                    }
+
+                    return $user->resolvedAccessPermissions();
+                },
             ],
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
@@ -96,6 +109,7 @@ class HandleInertiaRequests extends Middleware
 
                 if (Schema::hasTable('alumni')) {
                     $alumni = null;
+                    $canEditProfile = $user->isAdmin() || $user->hasAccessPermission('features.profile_edit');
 
                     if (Schema::hasColumn('users', 'nim') && is_string($user->nim) && trim($user->nim) !== '') {
                         $alumni = Alumni::query()->where('nim', trim($user->nim))->first();
@@ -109,7 +123,7 @@ class HandleInertiaRequests extends Middleware
                             ->first();
                     }
 
-                    if ($alumni) {
+                    if ($alumni && $canEditProfile) {
                         $missingFields = [];
 
                         if (! is_string($alumni->no_telepon) || trim($alumni->no_telepon) === '') {
@@ -152,5 +166,26 @@ class HandleInertiaRequests extends Middleware
                 ];
             },
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $template
+     * @return array<string, mixed>
+     */
+    private function allowAllPermissions(array $template): array
+    {
+        $resolved = [];
+
+        foreach ($template as $key => $value) {
+            if (is_array($value)) {
+                $resolved[$key] = $this->allowAllPermissions($value);
+
+                continue;
+            }
+
+            $resolved[$key] = true;
+        }
+
+        return $resolved;
     }
 }

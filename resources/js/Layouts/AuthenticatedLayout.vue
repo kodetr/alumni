@@ -21,6 +21,52 @@ const isMappingMenuActive = computed(() => page.url?.startsWith('/mapping'));
 const isDonationMenuActive = computed(() => page.url?.startsWith('/donasi'));
 const isBusinessMenuActive = computed(() => page.url?.startsWith('/bisnis'));
 
+const authPermissions = computed(() => page.props.auth?.permissions ?? {});
+const hasPermission = (path) => {
+    if (isAdmin.value) {
+        return true;
+    }
+
+    return path.split('.').reduce((accumulator, part) => {
+        if (accumulator && typeof accumulator === 'object' && part in accumulator) {
+            return accumulator[part];
+        }
+
+        return null;
+    }, authPermissions.value) === true;
+};
+
+const canProfileEdit = computed(() => hasPermission('features.profile_edit'));
+
+const canEventReunion = computed(() => hasPermission('features.event_reunion'));
+const canEventWebinar = computed(() => hasPermission('features.event_webinar'));
+const canEventNetworking = computed(() => hasPermission('features.event_networking'));
+const canEventRsvp = computed(() => hasPermission('features.event_rsvp'));
+const canEventMenu = computed(() => canEventReunion.value || canEventWebinar.value || canEventNetworking.value || canEventRsvp.value);
+
+const canMappingLocations = computed(() => hasPermission('features.mapping_locations'));
+const canMappingGlobal = computed(() => hasPermission('features.mapping_global'));
+const canMappingMenu = computed(() => canMappingLocations.value || canMappingGlobal.value);
+
+const canDonationOnline = computed(() => hasPermission('features.donation_online'));
+const canDonationScholarship = computed(() => hasPermission('features.donation_scholarship'));
+const canDonationCrowdfunding = computed(() => hasPermission('features.donation_crowdfunding'));
+const canDonationMenu = computed(() => canDonationOnline.value || canDonationScholarship.value || canDonationCrowdfunding.value);
+
+const canBusinessMarketplace = computed(() => hasPermission('features.business_marketplace'));
+const canBusinessPartnership = computed(() => hasPermission('features.business_partnership'));
+const canBusinessMentorship = computed(() => hasPermission('features.business_mentorship'));
+const canBusinessMenu = computed(() => canBusinessMarketplace.value || canBusinessPartnership.value || canBusinessMentorship.value);
+
+const canSocialForum = computed(() => hasPermission('features.social_forum'));
+const canSocialChat = computed(() => hasPermission('features.social_chat'));
+const canSocialGroups = computed(() => hasPermission('features.social_groups'));
+const canSocialMenu = computed(() => canSocialForum.value || canSocialChat.value || canSocialGroups.value);
+
+const canCareerJobs = computed(() => hasPermission('features.career_jobs'));
+const canCareerCenter = computed(() => hasPermission('features.career_center'));
+const canCareerMenu = computed(() => canCareerJobs.value || canCareerCenter.value);
+
 const notificationPayload = computed(() => page.props.notifications ?? {
     items: [],
     unreadCount: 0,
@@ -155,7 +201,7 @@ onMounted(() => {
                                 >
                                     Agenda
                                 </NavLink>
-                                <Dropdown class="flex items-center" align="left" width="48" content-classes="py-1 bg-white min-w-[17rem]">
+                                <Dropdown v-if="canEventMenu" class="flex items-center" align="left" width="48" content-classes="py-1 bg-white min-w-[17rem]">
                                     <template #trigger>
                                         <button
                                             type="button"
@@ -171,21 +217,21 @@ onMounted(() => {
                                         </button>
                                     </template>
                                     <template #content>
-                                        <DropdownLink :href="route('eventmenu.reunion')">
+                                        <DropdownLink v-if="canEventReunion" :href="route('eventmenu.reunion')">
                                             Reuni
                                         </DropdownLink>
-                                        <DropdownLink :href="route('eventmenu.webinar')">
+                                        <DropdownLink v-if="canEventWebinar" :href="route('eventmenu.webinar')">
                                             Webinar / Seminar
                                         </DropdownLink>
-                                        <DropdownLink :href="route('eventmenu.networking')">
+                                        <DropdownLink v-if="canEventNetworking" :href="route('eventmenu.networking')">
                                             Networking
                                         </DropdownLink>
-                                        <DropdownLink :href="route('eventmenu.rsvp')">
+                                        <DropdownLink v-if="canEventRsvp" :href="route('eventmenu.rsvp')">
                                             RSVP / Pendaftaran
                                         </DropdownLink>
                                     </template>
                                 </Dropdown>
-                                <Dropdown class="flex items-center" align="left" width="48" content-classes="py-1 bg-white min-w-[17rem]">
+                                <Dropdown v-if="canMappingMenu" class="flex items-center" align="left" width="48" content-classes="py-1 bg-white min-w-[17rem]">
                                     <template #trigger>
                                         <button
                                             type="button"
@@ -201,15 +247,15 @@ onMounted(() => {
                                         </button>
                                     </template>
                                     <template #content>
-                                        <DropdownLink :href="route('mapping.locations')">
+                                        <DropdownLink v-if="canMappingLocations" :href="route('mapping.locations')">
                                             Lokasi Alumni
                                         </DropdownLink>
-                                        <DropdownLink :href="route('mapping.global')">
+                                        <DropdownLink v-if="canMappingGlobal" :href="route('mapping.global')">
                                             Sebaran Global
                                         </DropdownLink>
                                     </template>
                                 </Dropdown>
-                                <Dropdown class="flex items-center" align="left" width="48" content-classes="py-1 bg-white min-w-[17rem]">
+                                <Dropdown v-if="canDonationMenu" class="flex items-center" align="left" width="48" content-classes="py-1 bg-white min-w-[17rem]">
                                     <template #trigger>
                                         <button
                                             type="button"
@@ -225,18 +271,18 @@ onMounted(() => {
                                         </button>
                                     </template>
                                     <template #content>
-                                        <DropdownLink :href="route('donation.online')">
+                                        <DropdownLink v-if="canDonationOnline" :href="route('donation.online')">
                                             Donasi Online
                                         </DropdownLink>
-                                        <DropdownLink :href="route('donation.scholarship')">
+                                        <DropdownLink v-if="canDonationScholarship" :href="route('donation.scholarship')">
                                             Program Beasiswa
                                         </DropdownLink>
-                                        <DropdownLink :href="route('donation.crowdfunding')">
+                                        <DropdownLink v-if="canDonationCrowdfunding" :href="route('donation.crowdfunding')">
                                             Crowdfunding
                                         </DropdownLink>
                                     </template>
                                 </Dropdown>
-                                <Dropdown class="flex items-center" align="left" width="48" content-classes="py-1 bg-white min-w-[17rem]">
+                                <Dropdown v-if="canBusinessMenu" class="flex items-center" align="left" width="48" content-classes="py-1 bg-white min-w-[17rem]">
                                     <template #trigger>
                                         <button
                                             type="button"
@@ -252,18 +298,18 @@ onMounted(() => {
                                         </button>
                                     </template>
                                     <template #content>
-                                        <DropdownLink :href="route('business.marketplace')">
+                                        <DropdownLink v-if="canBusinessMarketplace" :href="route('business.marketplace')">
                                             Marketplace
                                         </DropdownLink>
-                                        <DropdownLink :href="route('business.partnership')">
+                                        <DropdownLink v-if="canBusinessPartnership" :href="route('business.partnership')">
                                             Kerjasama
                                         </DropdownLink>
-                                        <DropdownLink :href="route('business.mentorship')">
+                                        <DropdownLink v-if="canBusinessMentorship" :href="route('business.mentorship')">
                                             Mentorship
                                         </DropdownLink>
                                     </template>
                                 </Dropdown>
-                                <Dropdown class="flex items-center" align="left" width="48" content-classes="py-1 bg-white min-w-[17rem]">
+                                <Dropdown v-if="canSocialMenu" class="flex items-center" align="left" width="48" content-classes="py-1 bg-white min-w-[17rem]">
                                     <template #trigger>
                                         <button
                                             type="button"
@@ -279,18 +325,18 @@ onMounted(() => {
                                         </button>
                                     </template>
                                     <template #content>
-                                        <DropdownLink :href="route('social.forum')">
+                                        <DropdownLink v-if="canSocialForum" :href="route('social.forum')">
                                             Diskusi
                                         </DropdownLink>
-                                        <DropdownLink :href="route('social.chat')">
+                                        <DropdownLink v-if="canSocialChat" :href="route('social.chat')">
                                             Chat
                                         </DropdownLink>
-                                        <DropdownLink :href="route('social.groups')">
+                                        <DropdownLink v-if="canSocialGroups" :href="route('social.groups')">
                                             Grup
                                         </DropdownLink>
                                     </template>
                                 </Dropdown>
-                                <Dropdown class="flex items-center" align="left" width="48" content-classes="py-1 bg-white min-w-[17rem]">
+                                <Dropdown v-if="canCareerMenu" class="flex items-center" align="left" width="48" content-classes="py-1 bg-white min-w-[17rem]">
                                     <template #trigger>
                                         <button
                                             type="button"
@@ -306,10 +352,10 @@ onMounted(() => {
                                         </button>
                                     </template>
                                     <template #content>
-                                        <DropdownLink :href="route('career.jobs')">
+                                        <DropdownLink v-if="canCareerJobs" :href="route('career.jobs')">
                                             Posting Loker
                                         </DropdownLink>
-                                        <DropdownLink :href="route('career.center')">
+                                        <DropdownLink v-if="canCareerCenter" :href="route('career.center')">
                                             Career Center
                                         </DropdownLink>
                                     </template>
@@ -438,6 +484,7 @@ onMounted(() => {
 
                                      <template #content>
                                          <DropdownLink
+                                             v-if="canProfileEdit"
                                              :href="route('profile.edit')"
                                          >
                                              Profile
@@ -539,121 +586,138 @@ onMounted(() => {
                         >
                             Agenda
                         </ResponsiveNavLink>
-                        <div class="px-4 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                        <div v-if="canEventMenu" class="px-4 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
                             Event
                         </div>
                         <ResponsiveNavLink
+                            v-if="canEventReunion"
                             :href="route('eventmenu.reunion')"
                             :active="route().current('eventmenu.reunion')"
                         >
                             Reuni
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
+                            v-if="canEventWebinar"
                             :href="route('eventmenu.webinar')"
                             :active="route().current('eventmenu.webinar')"
                         >
                             Webinar / Seminar
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
+                            v-if="canEventNetworking"
                             :href="route('eventmenu.networking')"
                             :active="route().current('eventmenu.networking')"
                         >
                             Networking
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
+                            v-if="canEventRsvp"
                             :href="route('eventmenu.rsvp')"
                             :active="route().current('eventmenu.rsvp')"
                         >
                             RSVP / Pendaftaran
                         </ResponsiveNavLink>
-                        <div class="px-4 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                        <div v-if="canMappingMenu" class="px-4 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
                             Mapping
                         </div>
                         <ResponsiveNavLink
+                            v-if="canMappingLocations"
                             :href="route('mapping.locations')"
                             :active="route().current('mapping.locations')"
                         >
                             Lokasi Alumni
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
+                            v-if="canMappingGlobal"
                             :href="route('mapping.global')"
                             :active="route().current('mapping.global')"
                         >
                             Sebaran Global
                         </ResponsiveNavLink>
-                        <div class="px-4 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                        <div v-if="canDonationMenu" class="px-4 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
                             Donasi
                         </div>
                         <ResponsiveNavLink
+                            v-if="canDonationOnline"
                             :href="route('donation.online')"
                             :active="route().current('donation.online')"
                         >
                             Donasi Online
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
+                            v-if="canDonationScholarship"
                             :href="route('donation.scholarship')"
                             :active="route().current('donation.scholarship')"
                         >
                             Program Beasiswa
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
+                            v-if="canDonationCrowdfunding"
                             :href="route('donation.crowdfunding')"
                             :active="route().current('donation.crowdfunding')"
                         >
                             Crowdfunding
                         </ResponsiveNavLink>
-                        <div class="px-4 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                        <div v-if="canBusinessMenu" class="px-4 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
                             Bisnis
                         </div>
                         <ResponsiveNavLink
+                            v-if="canBusinessMarketplace"
                             :href="route('business.marketplace')"
                             :active="route().current('business.marketplace')"
                         >
                             Marketplace
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
+                            v-if="canBusinessPartnership"
                             :href="route('business.partnership')"
                             :active="route().current('business.partnership')"
                         >
                             Kerjasama
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
+                            v-if="canBusinessMentorship"
                             :href="route('business.mentorship')"
                             :active="route().current('business.mentorship')"
                         >
                             Mentorship
                         </ResponsiveNavLink>
-                        <div class="px-4 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                        <div v-if="canSocialMenu" class="px-4 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
                             Jejaring Sosial
                         </div>
                         <ResponsiveNavLink
+                            v-if="canSocialForum"
                             :href="route('social.forum')"
                             :active="route().current('social.forum')"
                         >
                             Forum diskusi / komunitas
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
+                            v-if="canSocialChat"
                             :href="route('social.chat')"
                             :active="route().current('social.chat')"
                         >
                             Chat antar alumni
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
+                            v-if="canSocialGroups"
                             :href="route('social.groups')"
                             :active="route().current('social.groups')"
                         >
                             Grup berdasarkan angkatan/jurusan
                         </ResponsiveNavLink>
-                        <div class="px-4 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                        <div v-if="canCareerMenu" class="px-4 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
                             Karier
                         </div>
                         <ResponsiveNavLink
+                            v-if="canCareerJobs"
                             :href="route('career.jobs')"
                             :active="route().current('career.jobs')"
                         >
                             Posting Loker
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
+                            v-if="canCareerCenter"
                             :href="route('career.center')"
                             :active="route().current('career.center')"
                         >
@@ -687,7 +751,7 @@ onMounted(() => {
                         </div>
 
                         <div class="mt-3 space-y-1">
-                            <ResponsiveNavLink :href="route('profile.edit')">
+                            <ResponsiveNavLink v-if="canProfileEdit" :href="route('profile.edit')">
                                 Profile
                             </ResponsiveNavLink>
                             <ResponsiveNavLink

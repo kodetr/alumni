@@ -14,6 +14,7 @@ class IntegrationSetting extends Model
         'api_key',
         'maintenance_enabled',
         'maintenance_ends_at',
+        'default_alumni_permissions',
     ];
 
     /**
@@ -23,5 +24,6 @@ class IntegrationSetting extends Model
         'api_key' => 'encrypted',
         'maintenance_enabled' => 'boolean',
         'maintenance_ends_at' => 'datetime',
+        'default_alumni_permissions' => 'array',
     ];
 }
