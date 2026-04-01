@@ -116,13 +116,167 @@ Route::get('/maintenance/alumni', [AlumniMaintenanceController::class, 'show'])
 
 Route::get('/dashboard', function () {
     $isAdmin = request()->user()?->isAdmin() ?? false;
+    $requestedYear = request()->string('year')->trim()->toString();
 
     $totalAlumni = 0;
     $alumniTahunIni = 0;
+    $trackingScopeTotal = 0;
+    $trackingScopeLabel = 'Semua tahun';
+    $availableYears = [];
+    $selectedYear = null;
+    $tracking = [
+        'bekerja' => ['count' => 0, 'percentage' => 0],
+        'kuliah_lanjut' => ['count' => 0, 'percentage' => 0],
+        'wirausaha' => ['count' => 0, 'percentage' => 0],
+        'lainnya' => ['count' => 0, 'percentage' => 0],
+        'classified_count' => 0,
+    ];
 
     if ($isAdmin && Schema::hasTable('alumni')) {
         $totalAlumni = Alumni::count();
         $alumniTahunIni = Alumni::where('tahun_lulus', now()->year)->count();
+        $hasTahunLulusColumn = Schema::hasColumn('alumni', 'tahun_lulus');
+
+        if ($hasTahunLulusColumn) {
+            $availableYears = Alumni::query()
+                ->whereNotNull('tahun_lulus')
+                ->distinct()
+                ->orderByDesc('tahun_lulus')
+                ->pluck('tahun_lulus')
+                ->map(fn ($year): int => (int) $year)
+                ->filter(fn (int $year): bool => $year >= 1900 && $year <= now()->year + 10)
+                ->values()
+                ->all();
+
+            if (preg_match('/^\d{4}$/', $requestedYear) === 1) {
+                $yearCandidate = (int) $requestedYear;
+
+                if (in_array($yearCandidate, $availableYears, true)) {
+                    $selectedYear = $yearCandidate;
+                    $trackingScopeLabel = (string) $yearCandidate;
+                }
+            }
+        }
+
+        $hasPekerjaanColumn = Schema::hasColumn('alumni', 'pekerjaan');
+        $hasStatusBekerjaColumn = Schema::hasColumn('alumni', 'status_bekerja');
+        $columns = ['id'];
+
+        if ($hasTahunLulusColumn) {
+            $columns[] = 'tahun_lulus';
+        }
+
+        if ($hasPekerjaanColumn) {
+            $columns[] = 'pekerjaan';
+        }
+
+        if ($hasStatusBekerjaColumn) {
+            $columns[] = 'status_bekerja';
+        }
+
+        $bucketCounts = [
+            'bekerja' => 0,
+            'kuliah_lanjut' => 0,
+            'wirausaha' => 0,
+            'lainnya' => 0,
+        ];
+
+        $containsAnyKeyword = static function (string $haystack, array $keywords): bool {
+            foreach ($keywords as $keyword) {
+                if (str_contains($haystack, $keyword)) {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
+        $trackingQuery = Alumni::query()->select($columns);
+
+        if ($selectedYear !== null && $hasTahunLulusColumn) {
+            $trackingQuery->where('tahun_lulus', $selectedYear);
+        }
+
+        $trackingCollection = $trackingQuery->get();
+        $trackingScopeTotal = $trackingCollection->count();
+
+        $trackingCollection
+            ->each(function (Alumni $alumni) use (&$bucketCounts, $hasPekerjaanColumn, $hasStatusBekerjaColumn, $containsAnyKeyword): void {
+                $pekerjaan = $hasPekerjaanColumn
+                    ? strtolower(trim((string) ($alumni->pekerjaan ?? '')))
+                    : '';
+                $statusBekerja = $hasStatusBekerjaColumn
+                    ? (bool) ($alumni->status_bekerja ?? false)
+                    : false;
+
+                $isWirausaha = $containsAnyKeyword($pekerjaan, [
+                    'wirausaha',
+                    'wiraswasta',
+                    'entrepreneur',
+                    'pemilik usaha',
+                    'bisnis',
+                    'umkm',
+                    'startup',
+                ]);
+                $isKuliahLanjut = $containsAnyKeyword($pekerjaan, [
+                    'kuliah',
+                    'mahasiswa',
+                    'lanjut studi',
+                    'studi lanjut',
+                    'pascasarjana',
+                    'magister',
+                    'doktor',
+                    's2',
+                    's3',
+                    'residen',
+                ]);
+                $isNotWorking = $containsAnyKeyword($pekerjaan, [
+                    'belum bekerja',
+                    'tidak bekerja',
+                    'mencari kerja',
+                    'pengangguran',
+                    'menganggur',
+                ]);
+                $isBekerja = $statusBekerja || (
+                    $pekerjaan !== ''
+                    && ! $isWirausaha
+                    && ! $isKuliahLanjut
+                    && ! $isNotWorking
+                );
+
+                if ($isWirausaha) {
+                    $bucketCounts['wirausaha']++;
+
+                    return;
+                }
+
+                if ($isKuliahLanjut) {
+                    $bucketCounts['kuliah_lanjut']++;
+
+                    return;
+                }
+
+                if ($isBekerja) {
+                    $bucketCounts['bekerja']++;
+
+                    return;
+                }
+
+                $bucketCounts['lainnya']++;
+            });
+
+        $classifiedCount = $bucketCounts['bekerja'] + $bucketCounts['kuliah_lanjut'] + $bucketCounts['wirausaha'];
+        $toPercentage = static fn (int $count, int $total): float => $total > 0
+            ? round(($count / $total) * 100, 1)
+            : 0;
+
+        $tracking = [
+            'bekerja' => ['count' => $bucketCounts['bekerja'], 'percentage' => $toPercentage($bucketCounts['bekerja'], $trackingScopeTotal)],
+            'kuliah_lanjut' => ['count' => $bucketCounts['kuliah_lanjut'], 'percentage' => $toPercentage($bucketCounts['kuliah_lanjut'], $trackingScopeTotal)],
+            'wirausaha' => ['count' => $bucketCounts['wirausaha'], 'percentage' => $toPercentage($bucketCounts['wirausaha'], $trackingScopeTotal)],
+            'lainnya' => ['count' => $bucketCounts['lainnya'], 'percentage' => $toPercentage($bucketCounts['lainnya'], $trackingScopeTotal)],
+            'classified_count' => $classifiedCount,
+        ];
     }
 
     return Inertia::render('Dashboard', [
@@ -130,6 +284,13 @@ Route::get('/dashboard', function () {
         'stats' => [
             'totalAlumni' => $totalAlumni,
             'alumniTahunIni' => $alumniTahunIni,
+            'tracking' => $tracking,
+            'trackingScopeTotal' => $trackingScopeTotal,
+            'trackingScopeLabel' => $trackingScopeLabel,
+        ],
+        'filters' => [
+            'year' => $selectedYear,
+            'availableYears' => $availableYears,
         ],
     ]);
 })->middleware(['auth', 'alumni.maintenance', 'alumni.active', 'verified'])->name('dashboard');
@@ -179,6 +340,70 @@ Route::middleware(['auth', 'alumni.maintenance', 'alumni.active'])->group(functi
         Route::get('pengaturan/database/download/{fileName}', [IntegrationSettingsController::class, 'downloadBackup'])
             ->where('fileName', '[A-Za-z0-9._-]+')
             ->name('settings.database.download');
+    });
+
+    Route::prefix('jejaring-sosial')->name('social.')->group(function (): void {
+        Route::get('/', fn () => redirect()->route('social.forum'))
+            ->name('index');
+        Route::get('/forum-diskusi', fn () => Inertia::render('Social/Forum'))
+            ->name('forum');
+        Route::get('/chat-antar-alumni', fn () => Inertia::render('Social/Chat'))
+            ->name('chat');
+        Route::get('/grup-angkatan-jurusan', fn () => Inertia::render('Social/Groups'))
+            ->name('groups');
+    });
+
+    Route::prefix('karier')->name('career.')->group(function (): void {
+        Route::get('/', fn () => redirect()->route('career.jobs'))
+            ->name('index');
+        Route::get('/posting-loker', fn () => Inertia::render('Career/Jobs'))
+            ->name('jobs');
+        Route::get('/career-center', fn () => Inertia::render('Career/Center'))
+            ->name('center');
+    });
+
+    Route::prefix('event-alumni')->name('eventmenu.')->group(function (): void {
+        Route::get('/', fn () => redirect()->route('eventmenu.reunion'))
+            ->name('index');
+        Route::get('/reuni', fn () => Inertia::render('EventMenu/Reunion'))
+            ->name('reunion');
+        Route::get('/webinar-seminar', fn () => Inertia::render('EventMenu/Webinar'))
+            ->name('webinar');
+        Route::get('/networking', fn () => Inertia::render('EventMenu/Networking'))
+            ->name('networking');
+        Route::get('/rsvp-pendaftaran', fn () => Inertia::render('EventMenu/Rsvp'))
+            ->name('rsvp');
+    });
+
+    Route::prefix('mapping')->name('mapping.')->group(function (): void {
+        Route::get('/', fn () => redirect()->route('mapping.locations'))
+            ->name('index');
+        Route::get('/lokasi-alumni', fn () => Inertia::render('Mapping/Locations'))
+            ->name('locations');
+        Route::get('/sebaran-global', fn () => Inertia::render('Mapping/Global'))
+            ->name('global');
+    });
+
+    Route::prefix('donasi')->name('donation.')->group(function (): void {
+        Route::get('/', fn () => redirect()->route('donation.online'))
+            ->name('index');
+        Route::get('/online', fn () => Inertia::render('Donation/Online'))
+            ->name('online');
+        Route::get('/program-beasiswa', fn () => Inertia::render('Donation/Scholarship'))
+            ->name('scholarship');
+        Route::get('/crowdfunding', fn () => Inertia::render('Donation/Crowdfunding'))
+            ->name('crowdfunding');
+    });
+
+    Route::prefix('bisnis')->name('business.')->group(function (): void {
+        Route::get('/', fn () => redirect()->route('business.marketplace'))
+            ->name('index');
+        Route::get('/marketplace', fn () => Inertia::render('Business/Marketplace'))
+            ->name('marketplace');
+        Route::get('/kerjasama', fn () => Inertia::render('Business/Partnership'))
+            ->name('partnership');
+        Route::get('/mentorship', fn () => Inertia::render('Business/Mentorship'))
+            ->name('mentorship');
     });
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
