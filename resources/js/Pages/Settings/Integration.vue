@@ -166,6 +166,34 @@ const cleanString = (value) => {
     return value.trim();
 };
 
+const normalizeGender = (value) => {
+    const normalized = cleanString(value).toLowerCase();
+
+    if (['l', 'lk', 'laki-laki', 'laki laki', 'male', 'm', 'pria'].includes(normalized)) {
+        return 'L';
+    }
+
+    if (['p', 'pr', 'perempuan', 'female', 'f', 'wanita'].includes(normalized)) {
+        return 'P';
+    }
+
+    return null;
+};
+
+const genderLabel = (value) => {
+    const normalized = normalizeGender(value);
+
+    if (normalized === 'L') {
+        return 'Laki-laki';
+    }
+
+    if (normalized === 'P') {
+        return 'Perempuan';
+    }
+
+    return '-';
+};
+
 const toAbsolutePhotoUrl = (path) => {
     const cleanedPath = cleanString(path);
 
@@ -276,7 +304,7 @@ const extractPreviewRows = (result) => {
                 tempat_lahir: cleanString(item?.birth_place) || null,
                 tanggal_lahir: item?.birth_date || null,
                 agama: cleanString(item?.religion) || null,
-                jenis_kelamin: item?.gender || null,
+                jenis_kelamin: normalizeGender(item?.jenis_kelamin ?? item?.gender),
                 no_ktp: cleanString(item?.ktp_number) || null,
                 ipk: item?.ipk || null,
                 predikat: cleanString(item?.predicate) || null,
@@ -1091,7 +1119,7 @@ onBeforeUnmount(() => {
                             <div>
                                 <p class="text-xs text-gray-500">Jenis Kelamin</p>
                                 <p class="font-medium text-gray-900">
-                                    {{ selectedDetailItem.jenis_kelamin === 'L' ? 'Laki-laki' : selectedDetailItem.jenis_kelamin === 'P' ? 'Perempuan' : '-' }}
+                                    {{ genderLabel(selectedDetailItem.jenis_kelamin) }}
                                 </p>
                             </div>
                             <div>
