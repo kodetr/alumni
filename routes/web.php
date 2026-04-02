@@ -5,6 +5,7 @@ use App\Http\Controllers\AlumniController;
 use App\Http\Controllers\AlumniMaintenanceController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\IntegrationSettingsController;
+use App\Http\Controllers\MappingLocationController;
 use App\Http\Controllers\NewsPostController;
 use App\Http\Controllers\ProfileController;
 use App\Models\Alumni;
@@ -397,7 +398,7 @@ Route::middleware(['auth', 'alumni.maintenance', 'alumni.active'])->group(functi
         Route::get('/', fn () => redirect()->route('mapping.locations'))
             ->middleware('permission:features.mapping_locations')
             ->name('index');
-        Route::get('/lokasi-alumni', fn () => Inertia::render('Mapping/Locations'))
+        Route::get('/lokasi-alumni', [MappingLocationController::class, 'locations'])
             ->middleware('permission:features.mapping_locations')
             ->name('locations');
         Route::get('/sebaran-global', fn () => Inertia::render('Mapping/Global'))
