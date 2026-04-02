@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -168,9 +169,13 @@ class IntegrationSettingsController extends Controller
 
         $created = 0;
         $updated = 0;
+        $hasCoordinateColumns = Schema::hasColumn('alumni', 'latitude')
+            && Schema::hasColumn('alumni', 'longitude');
+        $hasGeocodedMetaColumns = Schema::hasColumn('alumni', 'geocoded_at')
+            && Schema::hasColumn('alumni', 'geocoding_source');
 
         try {
-            DB::transaction(function () use ($records, &$created, &$updated): void {
+            DB::transaction(function () use ($records, &$created, &$updated, $hasCoordinateColumns, $hasGeocodedMetaColumns): void {
                 foreach ($records as $record) {
                     $nim = trim((string) $record['nim']);
 
@@ -198,44 +203,73 @@ class IntegrationSettingsController extends Controller
                         $statusBekerja = (bool) $statusBekerja;
                     }
 
+                    $incomingLatitude = $this->nullableCoordinate(
+                        $record['latitude']
+                            ?? $record['lat']
+                            ?? $record['integration_payload']['latitude']
+                            ?? $record['integration_payload']['lat']
+                            ?? null
+                    );
+                    $incomingLongitude = $this->nullableCoordinate(
+                        $record['longitude']
+                            ?? $record['lng']
+                            ?? $record['lon']
+                            ?? $record['integration_payload']['longitude']
+                            ?? $record['integration_payload']['lng']
+                            ?? $record['integration_payload']['lon']
+                            ?? null
+                    );
+
+                    $alumniPayload = [
+                        'nama' => trim((string) ($record['nama'] ?? $record['full_name'] ?? '-')),
+                        'email_kampus' => $this->nullableString($record['email_kampus'] ?? $record['campus_email'] ?? null),
+                        'email_pribadi' => $this->nullableString($record['email_pribadi'] ?? $record['personal_email'] ?? null),
+                        'photo_url' => $this->downloadAndSavePhoto(
+                            $record['photo_url'] ?? null,
+                            $record['integration_payload']['photo_3x4_path'] ?? $record['photo_3x4_path'] ?? null,
+                            $nim,
+                        ),
+                        'no_telepon' => $this->nullableString($record['no_telepon'] ?? $record['phone_number'] ?? null),
+                        'jurusan' => $jurusan,
+                        'tahun_lulus' => isset($record['tahun_lulus']) && $record['tahun_lulus'] !== '' ? (int) $record['tahun_lulus'] : null,
+                        'pekerjaan' => $this->nullableString($record['pekerjaan'] ?? null),
+                        'organisasi' => $this->nullableString($record['organisasi'] ?? null),
+                        'fakultas' => $this->nullableString($record['fakultas'] ?? $record['faculty_name'] ?? null),
+                        'alamat' => $this->nullableString($record['alamat'] ?? null),
+                        'integration_payload' => isset($record['integration_payload']) && is_array($record['integration_payload'])
+                            ? $this->filterIntegrationPayload($record['integration_payload'])
+                            : null,
+                        'tempat_lahir' => $this->nullableString($record['tempat_lahir'] ?? $record['birth_place'] ?? null),
+                        'tanggal_lahir' => $this->parseDate($record['tanggal_lahir'] ?? $record['birth_date'] ?? null),
+                        'agama' => $this->nullableString($record['agama'] ?? $record['religion'] ?? null),
+                        'jenis_kelamin' => $this->normalizeGender($record['jenis_kelamin'] ?? $record['gender'] ?? null),
+                        'no_ktp' => $this->nullableString($record['no_ktp'] ?? $record['ktp_number'] ?? null),
+                        'ipk' => isset($record['ipk']) ? (float) $record['ipk'] : null,
+                        'predikat' => $this->nullableString($record['predikat'] ?? $record['predicate'] ?? null),
+                        'judul_skripsi' => $this->nullableString($record['judul_skripsi'] ?? $record['thesis_title'] ?? null),
+                        'pembimbing_1' => $this->nullableString($record['pembimbing_1'] ?? $record['supervisor_1'] ?? null),
+                        'pembimbing_2' => $this->nullableString($record['pembimbing_2'] ?? $record['supervisor_2'] ?? null),
+                        'ukuran_toga' => $this->nullableString($record['ukuran_toga'] ?? $record['gown_size'] ?? null),
+                        'status_bekerja' => $statusBekerja,
+                        'nama_ayah' => $this->nullableString($record['nama_ayah'] ?? $record['father_name'] ?? null),
+                        'nama_ibu' => $this->nullableString($record['nama_ibu'] ?? $record['mother_name'] ?? null),
+                        'no_telepon_orang_tua' => $this->nullableString($record['no_telepon_orang_tua'] ?? $record['parent_phone'] ?? null),
+                        'link_dokumen_tambahan' => $this->nullableString($record['link_dokumen_tambahan'] ?? $record['additional_document_link'] ?? null),
+                    ];
+
+                    if ($hasCoordinateColumns && $incomingLatitude !== null && $incomingLongitude !== null) {
+                        $alumniPayload['latitude'] = $incomingLatitude;
+                        $alumniPayload['longitude'] = $incomingLongitude;
+
+                        if ($hasGeocodedMetaColumns) {
+                            $alumniPayload['geocoded_at'] = now();
+                            $alumniPayload['geocoding_source'] = 'integration_payload';
+                        }
+                    }
+
                     Alumni::query()->updateOrCreate(
                         ['nim' => $nim],
-                        [
-                            'nama' => trim((string) ($record['nama'] ?? $record['full_name'] ?? '-')),
-                            'email_kampus' => $this->nullableString($record['email_kampus'] ?? $record['campus_email'] ?? null),
-                            'email_pribadi' => $this->nullableString($record['email_pribadi'] ?? $record['personal_email'] ?? null),
-                            'photo_url' => $this->downloadAndSavePhoto(
-                                $record['photo_url'] ?? null,
-                                $record['integration_payload']['photo_3x4_path'] ?? $record['photo_3x4_path'] ?? null,
-                                $nim,
-                            ),
-                            'no_telepon' => $this->nullableString($record['no_telepon'] ?? $record['phone_number'] ?? null),
-                            'jurusan' => $jurusan,
-                            'tahun_lulus' => isset($record['tahun_lulus']) && $record['tahun_lulus'] !== '' ? (int) $record['tahun_lulus'] : null,
-                            'pekerjaan' => $this->nullableString($record['pekerjaan'] ?? null),
-                            'organisasi' => $this->nullableString($record['organisasi'] ?? null),
-                            'fakultas' => $this->nullableString($record['fakultas'] ?? $record['faculty_name'] ?? null),
-                            'alamat' => $this->nullableString($record['alamat'] ?? null),
-                            'integration_payload' => isset($record['integration_payload']) && is_array($record['integration_payload'])
-                                ? $this->filterIntegrationPayload($record['integration_payload'])
-                                : null,
-                            'tempat_lahir' => $this->nullableString($record['tempat_lahir'] ?? $record['birth_place'] ?? null),
-                            'tanggal_lahir' => $this->parseDate($record['tanggal_lahir'] ?? $record['birth_date'] ?? null),
-                            'agama' => $this->nullableString($record['agama'] ?? $record['religion'] ?? null),
-                            'jenis_kelamin' => $this->normalizeGender($record['jenis_kelamin'] ?? $record['gender'] ?? null),
-                            'no_ktp' => $this->nullableString($record['no_ktp'] ?? $record['ktp_number'] ?? null),
-                            'ipk' => isset($record['ipk']) ? (float) $record['ipk'] : null,
-                            'predikat' => $this->nullableString($record['predikat'] ?? $record['predicate'] ?? null),
-                            'judul_skripsi' => $this->nullableString($record['judul_skripsi'] ?? $record['thesis_title'] ?? null),
-                            'pembimbing_1' => $this->nullableString($record['pembimbing_1'] ?? $record['supervisor_1'] ?? null),
-                            'pembimbing_2' => $this->nullableString($record['pembimbing_2'] ?? $record['supervisor_2'] ?? null),
-                            'ukuran_toga' => $this->nullableString($record['ukuran_toga'] ?? $record['gown_size'] ?? null),
-                            'status_bekerja' => $statusBekerja,
-                            'nama_ayah' => $this->nullableString($record['nama_ayah'] ?? $record['father_name'] ?? null),
-                            'nama_ibu' => $this->nullableString($record['nama_ibu'] ?? $record['mother_name'] ?? null),
-                            'no_telepon_orang_tua' => $this->nullableString($record['no_telepon_orang_tua'] ?? $record['parent_phone'] ?? null),
-                            'link_dokumen_tambahan' => $this->nullableString($record['link_dokumen_tambahan'] ?? $record['additional_document_link'] ?? null),
-                        ],
+                        $alumniPayload,
                     );
 
                     if ($existing) {
@@ -1212,6 +1246,23 @@ class IntegrationSettingsController extends Controller
         $trimmed = trim($value);
 
         return $trimmed !== '' ? $trimmed : null;
+    }
+
+    private function nullableCoordinate(mixed $value): ?float
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $normalized = is_string($value)
+            ? str_replace(',', '.', trim($value))
+            : $value;
+
+        if (! is_numeric($normalized)) {
+            return null;
+        }
+
+        return (float) $normalized;
     }
 
     private function normalizeGender(mixed $value): ?string

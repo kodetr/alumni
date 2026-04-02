@@ -24,6 +24,10 @@ class Alumni extends Model
         'organisasi',
         'fakultas',
         'alamat',
+        'latitude',
+        'longitude',
+        'geocoded_at',
+        'geocoding_source',
         'integration_payload',
         'tempat_lahir',
         'tanggal_lahir',
@@ -48,6 +52,9 @@ class Alumni extends Model
      */
     protected $casts = [
         'tahun_lulus' => 'integer',
+        'latitude' => 'float',
+        'longitude' => 'float',
+        'geocoded_at' => 'datetime',
         'integration_payload' => 'array',
         'tanggal_lahir' => 'date',
         'ipk' => 'decimal:2',

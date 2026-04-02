@@ -6,6 +6,8 @@ use App\Models\Alumni;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -13,6 +15,16 @@ use Inertia\Response;
 
 class MappingLocationController extends Controller
 {
+    private const GEOCODING_ENDPOINT = 'https://nominatim.openstreetmap.org/search';
+
+    private const GEOCODING_CACHE_PREFIX = 'mapping:geocode:';
+
+    private const GEOCODING_SUCCESS_TTL_DAYS = 30;
+
+    private const GEOCODING_FAILURE_TTL_HOURS = 12;
+
+    private const GEOCODING_MAX_LOOKUPS_PER_REQUEST = 10;
+
     /**
      * @var array<int, array{key: string, label: string, lat: float, lng: float, aliases: array<int, string>}>
      */
@@ -39,6 +51,19 @@ class MappingLocationController extends Controller
         ['key' => 'makassar', 'label' => 'Makassar', 'lat' => -5.1477, 'lng' => 119.4327, 'aliases' => ['makassar', 'ujung pandang']],
         ['key' => 'manado', 'label' => 'Manado', 'lat' => 1.4748, 'lng' => 124.8421, 'aliases' => ['manado', 'kota manado']],
     ];
+
+    /**
+     * @var array<string, array{lat: float, lng: float, city: ?string}|null>
+     */
+    private array $runtimeGeocodingCache = [];
+
+    private int $geocodingLookupCount = 0;
+
+    private ?bool $coordinateColumnsAvailable = null;
+
+    private ?bool $geocodedAtColumnAvailable = null;
+
+    private ?bool $geocodingSourceColumnAvailable = null;
 
     public function locations(Request $request): Response
     {
@@ -70,7 +95,7 @@ class MappingLocationController extends Controller
             ]);
         }
 
-        $query = Alumni::query()->select([
+        $selectColumns = [
             'id',
             'nim',
             'nama',
@@ -79,7 +104,18 @@ class MappingLocationController extends Controller
             'alamat',
             'tempat_lahir',
             'updated_at',
-        ]);
+        ];
+
+        if ($this->hasCoordinateColumns()) {
+            $selectColumns[] = 'latitude';
+            $selectColumns[] = 'longitude';
+        }
+
+        if ($this->hasGeocodingSourceColumn()) {
+            $selectColumns[] = 'geocoding_source';
+        }
+
+        $query = Alumni::query()->select($selectColumns);
 
         if ($search !== '') {
             $query->where(function ($searchQuery) use ($search): void {
@@ -167,7 +203,17 @@ class MappingLocationController extends Controller
             ->values()
             ->all();
 
-        $markers = collect($topCities)
+        $markers = $this->aggregateCities($alumniCollection)
+            ->sortByDesc('count')
+            ->values()
+            ->map(function (array $item) use ($totalAlumni): array {
+                return [
+                    ...$item,
+                    'percentage' => $totalAlumni > 0
+                        ? round(($item['count'] / $totalAlumni) * 100, 1)
+                        : 0,
+                ];
+            })
             ->filter(fn (array $item): bool => $item['lat'] !== null && $item['lng'] !== null)
             ->values()
             ->all();
@@ -218,19 +264,66 @@ class MappingLocationController extends Controller
         $address = is_string($alumni->alamat) ? trim($alumni->alamat) : '';
         $birthPlace = is_string($alumni->tempat_lahir) ? trim($alumni->tempat_lahir) : '';
         $locationText = strtolower(trim($address.' '.$birthPlace));
+        $fallbackCity = $this->extractCityFromAddress($address);
+        $catalogCity = $this->matchCatalogCity($locationText);
+        $labelFallback = $catalogCity['label']
+            ?? $fallbackCity
+            ?? ($birthPlace !== '' ? $birthPlace : null);
 
-        foreach (self::CITY_CATALOG as $city) {
-            foreach ($city['aliases'] as $alias) {
-                if (str_contains($locationText, strtolower($alias))) {
-                    return [
-                        'key' => $city['key'],
-                        'label' => $city['label'],
-                        'source' => $address !== '' ? 'Alamat' : 'Tempat Lahir',
-                        'lat' => $city['lat'],
-                        'lng' => $city['lng'],
-                    ];
-                }
+        if ($this->hasCoordinateColumns()) {
+            $storedLatitude = is_numeric($alumni->latitude) ? (float) $alumni->latitude : null;
+            $storedLongitude = is_numeric($alumni->longitude) ? (float) $alumni->longitude : null;
+
+            if ($storedLatitude !== null && $storedLongitude !== null) {
+                $label = $labelFallback ?? 'Lokasi Tersimpan';
+
+                return [
+                    'key' => $catalogCity['key'] ?? Str::slug($label),
+                    'label' => $label,
+                    'source' => $this->resolveStoredSourceLabel($alumni),
+                    'lat' => $storedLatitude,
+                    'lng' => $storedLongitude,
+                ];
             }
+        }
+
+        if ($address !== '') {
+            $geocodedAddress = $this->geocodeAddress($address);
+
+            if ($geocodedAddress !== null) {
+                $label = $catalogCity['label']
+                    ?? $geocodedAddress['city']
+                    ?? $fallbackCity
+                    ?? ($birthPlace !== '' ? $birthPlace : 'Lokasi Alamat');
+
+                return [
+                    'key' => $catalogCity['key'] ?? Str::slug($label),
+                    'label' => $label,
+                    'source' => 'Alamat (Geocoding)',
+                    'lat' => $geocodedAddress['lat'],
+                    'lng' => $geocodedAddress['lng'],
+                ];
+
+                $this->persistCoordinates($alumni, $geocodedAddress['lat'], $geocodedAddress['lng'], 'address_geocoding');
+
+                return $resolved;
+            }
+        }
+
+        if ($catalogCity !== null) {
+            $resolved = [
+                'key' => $catalogCity['key'],
+                'label' => $catalogCity['label'],
+                'source' => $address !== '' ? 'Alamat (Katalog Kota)' : 'Tempat Lahir',
+                'lat' => $catalogCity['lat'],
+                'lng' => $catalogCity['lng'],
+            ];
+
+            if ($address !== '') {
+                $this->persistCoordinates($alumni, $catalogCity['lat'], $catalogCity['lng'], 'catalog_city');
+            }
+
+            return $resolved;
         }
 
         if ($birthPlace !== '') {
@@ -242,8 +335,6 @@ class MappingLocationController extends Controller
                 'lng' => null,
             ];
         }
-
-        $fallbackCity = $this->extractCityFromAddress($address);
 
         if ($fallbackCity !== null) {
             return [
@@ -261,6 +352,254 @@ class MappingLocationController extends Controller
             'source' => null,
             'lat' => null,
             'lng' => null,
+        ];
+    }
+
+    private function hasCoordinateColumns(): bool
+    {
+        if ($this->coordinateColumnsAvailable !== null) {
+            return $this->coordinateColumnsAvailable;
+        }
+
+        $this->coordinateColumnsAvailable = Schema::hasColumn('alumni', 'latitude')
+            && Schema::hasColumn('alumni', 'longitude');
+
+        return $this->coordinateColumnsAvailable;
+    }
+
+    private function hasGeocodedAtColumn(): bool
+    {
+        if ($this->geocodedAtColumnAvailable !== null) {
+            return $this->geocodedAtColumnAvailable;
+        }
+
+        $this->geocodedAtColumnAvailable = Schema::hasColumn('alumni', 'geocoded_at');
+
+        return $this->geocodedAtColumnAvailable;
+    }
+
+    private function hasGeocodingSourceColumn(): bool
+    {
+        if ($this->geocodingSourceColumnAvailable !== null) {
+            return $this->geocodingSourceColumnAvailable;
+        }
+
+        $this->geocodingSourceColumnAvailable = Schema::hasColumn('alumni', 'geocoding_source');
+
+        return $this->geocodingSourceColumnAvailable;
+    }
+
+    private function resolveStoredSourceLabel(Alumni $alumni): string
+    {
+        if (! $this->hasGeocodingSourceColumn()) {
+            return 'Koordinat Tersimpan';
+        }
+
+        return match ($alumni->geocoding_source) {
+            'address_geocoding' => 'Alamat (Geocoding Tersimpan)',
+            'catalog_city' => 'Alamat (Katalog Kota Tersimpan)',
+            'integration_payload' => 'Alamat (Dari Integrasi)',
+            default => 'Koordinat Tersimpan',
+        };
+    }
+
+    private function persistCoordinates(Alumni $alumni, float $lat, float $lng, string $source): void
+    {
+        if (! $this->hasCoordinateColumns()) {
+            return;
+        }
+
+        $storedLatitude = is_numeric($alumni->latitude) ? (float) $alumni->latitude : null;
+        $storedLongitude = is_numeric($alumni->longitude) ? (float) $alumni->longitude : null;
+        $storedSource = $this->hasGeocodingSourceColumn() ? $alumni->geocoding_source : null;
+
+        if (
+            $storedLatitude !== null
+            && $storedLongitude !== null
+            && abs($storedLatitude - $lat) < 0.0000001
+            && abs($storedLongitude - $lng) < 0.0000001
+            && (! $this->hasGeocodingSourceColumn() || $storedSource === $source)
+        ) {
+            return;
+        }
+
+        $updateData = [
+            'latitude' => round($lat, 7),
+            'longitude' => round($lng, 7),
+        ];
+
+        if ($this->hasGeocodedAtColumn()) {
+            $updateData['geocoded_at'] = now();
+        }
+
+        if ($this->hasGeocodingSourceColumn()) {
+            $updateData['geocoding_source'] = $source;
+        }
+
+        Alumni::withoutTimestamps(function () use ($alumni, $updateData): void {
+            $alumni->forceFill($updateData)->saveQuietly();
+        });
+    }
+
+    /**
+     * @return array{key: string, label: string, lat: float, lng: float, aliases: array<int, string>}|null
+     */
+    private function matchCatalogCity(string $text): ?array
+    {
+        $normalizedText = strtolower(trim($text));
+
+        if ($normalizedText === '') {
+            return null;
+        }
+
+        foreach (self::CITY_CATALOG as $city) {
+            foreach ($city['aliases'] as $alias) {
+                if (str_contains($normalizedText, strtolower($alias))) {
+                    return $city;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{lat: float, lng: float, city: ?string}|null
+     */
+    private function geocodeAddress(string $address): ?array
+    {
+        $normalizedAddress = $this->normalizeAddress($address);
+
+        if ($normalizedAddress === '') {
+            return null;
+        }
+
+        if (array_key_exists($normalizedAddress, $this->runtimeGeocodingCache)) {
+            return $this->runtimeGeocodingCache[$normalizedAddress];
+        }
+
+        $cacheKey = self::GEOCODING_CACHE_PREFIX.sha1($normalizedAddress);
+        $cached = Cache::get($cacheKey, '__missing__');
+
+        if ($cached !== '__missing__') {
+            $resolved = is_array($cached) ? $this->parseGeocodingPayload($cached) : null;
+            $this->runtimeGeocodingCache[$normalizedAddress] = $resolved;
+
+            return $resolved;
+        }
+
+        if ($this->geocodingLookupCount >= self::GEOCODING_MAX_LOOKUPS_PER_REQUEST) {
+            $this->runtimeGeocodingCache[$normalizedAddress] = null;
+
+            return null;
+        }
+
+        $this->geocodingLookupCount++;
+
+        $headers = [
+            'User-Agent' => $this->geocodingUserAgent(),
+        ];
+
+        $appUrl = config('app.url');
+
+        if (is_string($appUrl) && trim($appUrl) !== '') {
+            $headers['Referer'] = trim($appUrl);
+        }
+
+        try {
+            $response = Http::timeout(6)
+                ->acceptJson()
+                ->withHeaders($headers)
+                ->get(self::GEOCODING_ENDPOINT, [
+                    'q' => $normalizedAddress.' Indonesia',
+                    'format' => 'jsonv2',
+                    'addressdetails' => 1,
+                    'limit' => 1,
+                    'countrycodes' => 'id',
+                ]);
+        } catch (\Throwable) {
+            $this->runtimeGeocodingCache[$normalizedAddress] = null;
+
+            return null;
+        }
+
+        if (! $response->ok()) {
+            Cache::put($cacheKey, false, now()->addHours(self::GEOCODING_FAILURE_TTL_HOURS));
+            $this->runtimeGeocodingCache[$normalizedAddress] = null;
+
+            return null;
+        }
+
+        $results = $response->json();
+
+        if (! is_array($results) || ! isset($results[0]) || ! is_array($results[0])) {
+            Cache::put($cacheKey, false, now()->addHours(self::GEOCODING_FAILURE_TTL_HOURS));
+            $this->runtimeGeocodingCache[$normalizedAddress] = null;
+
+            return null;
+        }
+
+        $resolved = $this->parseGeocodingPayload($results[0]);
+
+        if ($resolved === null) {
+            Cache::put($cacheKey, false, now()->addHours(self::GEOCODING_FAILURE_TTL_HOURS));
+            $this->runtimeGeocodingCache[$normalizedAddress] = null;
+
+            return null;
+        }
+
+        Cache::put($cacheKey, $resolved, now()->addDays(self::GEOCODING_SUCCESS_TTL_DAYS));
+        $this->runtimeGeocodingCache[$normalizedAddress] = $resolved;
+
+        return $resolved;
+    }
+
+    private function normalizeAddress(string $address): string
+    {
+        $normalized = strtolower(trim($address));
+
+        return preg_replace('/\s+/', ' ', $normalized) ?? '';
+    }
+
+    private function geocodingUserAgent(): string
+    {
+        $appName = trim((string) config('app.name', 'AlumniApp'));
+        $appUrl = trim((string) config('app.url', 'http://localhost'));
+
+        return $appName.' Mapping/1.0 ('.$appUrl.')';
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array{lat: float, lng: float, city: ?string}|null
+     */
+    private function parseGeocodingPayload(array $payload): ?array
+    {
+        $lat = filter_var($payload['lat'] ?? null, FILTER_VALIDATE_FLOAT, FILTER_NULL_ON_FAILURE);
+        $lng = filter_var($payload['lon'] ?? $payload['lng'] ?? null, FILTER_VALIDATE_FLOAT, FILTER_NULL_ON_FAILURE);
+
+        if (! is_float($lat) || ! is_float($lng)) {
+            return null;
+        }
+
+        $address = is_array($payload['address'] ?? null) ? $payload['address'] : [];
+        $city = is_string($payload['city'] ?? null) ? trim((string) $payload['city']) : null;
+
+        if ($city === null || $city === '') {
+            foreach (['city', 'town', 'municipality', 'village', 'county', 'state_district', 'state'] as $field) {
+                $value = $address[$field] ?? null;
+
+                if (is_string($value) && trim($value) !== '') {
+                    $city = trim($value);
+                    break;
+                }
+            }
+        }
+
+        return [
+            'lat' => (float) $lat,
+            'lng' => (float) $lng,
+            'city' => $city !== '' ? $city : null,
         ];
     }
 
@@ -299,13 +638,23 @@ class MappingLocationController extends Controller
             ->groupBy('location_key')
             ->map(function (Collection $group): array {
                 $first = $group->first();
+                $latitudes = $group
+                    ->pluck('lat')
+                    ->filter(fn ($value): bool => is_numeric($value))
+                    ->map(fn ($value): float => (float) $value)
+                    ->values();
+                $longitudes = $group
+                    ->pluck('lng')
+                    ->filter(fn ($value): bool => is_numeric($value))
+                    ->map(fn ($value): float => (float) $value)
+                    ->values();
 
                 return [
                     'key' => (string) ($first['location_key'] ?? Str::slug((string) $first['location_label'])),
                     'label' => (string) $first['location_label'],
                     'count' => $group->count(),
-                    'lat' => is_numeric($first['lat']) ? (float) $first['lat'] : null,
-                    'lng' => is_numeric($first['lng']) ? (float) $first['lng'] : null,
+                    'lat' => $latitudes->isNotEmpty() ? round((float) $latitudes->avg(), 6) : null,
+                    'lng' => $longitudes->isNotEmpty() ? round((float) $longitudes->avg(), 6) : null,
                 ];
             })
             ->values();

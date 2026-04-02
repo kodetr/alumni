@@ -22,6 +22,8 @@
     },
     "dependencies": {
         "@vueup/vue-quill": "^1.2.0",
+        "leaflet": "^1.9.4",
+        "leaflet.markercluster": "^1.5.3",
         "quill": "^2.0.3",
         "sweetalert2": "^11.26.24"
     }
